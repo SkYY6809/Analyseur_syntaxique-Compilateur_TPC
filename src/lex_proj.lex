@@ -1,6 +1,7 @@
 %{
 #include "tree.h"
 #include "bison_proj.h"
+#include "compiler.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -130,7 +131,13 @@ int main(int argc, char **argv) {
         if(tree && root){
             printf("Affichage de l'arbre abstrait \n");
             printTree(root);
-            deleteTree(root);
+        }
+        if(root) {
+            Table_symb * tableGlobale = NULL;
+            analyse_semantique(root, &tableGlobale); // On lance le parcours
+            printf("--- Table Globale ---\n");
+            printT(tableGlobale);
+            freeTable(tableGlobale);
         }
         printf("Analyse syntaxique réussie !\n");
         return 0;
@@ -138,4 +145,6 @@ int main(int argc, char **argv) {
     else{
         return 1;
     }
+
+
 }
