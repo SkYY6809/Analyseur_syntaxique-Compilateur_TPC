@@ -1,0 +1,9 @@
+/* ERREUR : Structure sans champs (interdit) */
+
+/* ERREUR : une structure doit avoir au moins un champ */
+struct empty {
+};
+
+int main() {
+    return 0;
+}

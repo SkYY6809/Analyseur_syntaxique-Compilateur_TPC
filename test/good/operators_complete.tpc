@@ -1,0 +1,135 @@
+/* Test complet de tous les opérateurs */
+
+int a, b, c, result;
+char ch;
+
+void testArithmetic() {
+    /* Opérateurs de base */
+    a = 10 + 5;
+    b = 20 - 8;
+    c = 4 * 3;
+    result = 15 / 3;
+    
+    /* Modulo */
+    a = 17 % 5;
+    b = 100 % 7;
+    c = 23 % 4;
+}
+
+void testUnary() {
+    a = 10;
+    
+    /* Plus unaire */
+    b = +a;
+    c = +15;
+    
+    /* Moins unaire */
+    b = -a;
+    c = -20;
+    result = -b + -c;
+    
+    /* Négation booléenne */
+    if (!a) {
+        b = 1;
+    }
+    
+    c = !0;
+    result = !result;
+}
+
+void testComparison() {
+    a = 10;
+    b = 20;
+    
+    /* Égalité */
+    if (a == b) {
+        c = 1;
+    }
+    
+    if (a != b) {
+        c = 2;
+    }
+    
+    /* Ordre */
+    if (a < b) {
+        c = 3;
+    }
+    
+    if (a <= b) {
+        c = 4;
+    }
+    
+    if (b > a) {
+        c = 5;
+    }
+    
+    if (b >= a) {
+        c = 6;
+    }
+}
+
+void testLogical() {
+    a = 1;
+    b = 0;
+    c = 1;
+    
+    /* AND logique */
+    if (a && c) {
+        result = 1;
+    }
+    
+    if (a && b) {
+        result = 2;
+    }
+    
+    /* OR logique */
+    if (a || b) {
+        result = 3;
+    }
+    
+    if (b || c) {
+        result = 4;
+    }
+    
+    /* Combinaisons */
+    if (a && b || c) {
+        result = 5;
+    }
+    
+    if ((a || b) && c) {
+        result = 6;
+    }
+    
+    if (!a || b && c) {
+        result = 7;
+    }
+}
+
+void testComplexExpressions() {
+    /* Priorité des opérateurs */
+    a = 2 + 3 * 4;
+    b = (2 + 3) * 4;
+    c = 10 - 6 / 2;
+    result = 20 % 7 + 3;
+    
+    /* Expressions avec unaires */
+    a = -5 + 10;
+    b = -(a + 5);
+    c = +a * -b;
+    
+    /* Expressions complexes */
+    result = (a + b) * (c - 5) / 2 + 10 % 3;
+    
+    if (a > 0 && b < 100 || c == 0) {
+        result = !result;
+    }
+}
+
+int main() {
+    testArithmetic();
+    testUnary();
+    testComparison();
+    testLogical();
+    testComplexExpressions();
+    return result;
+}

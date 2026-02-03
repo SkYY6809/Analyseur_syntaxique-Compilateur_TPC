@@ -1,0 +1,99 @@
+/* Test complet des boucles while */
+
+int i, j, sum, count;
+
+void simpleWhile() {
+    i = 0;
+    sum = 0;
+    
+    while (i < 10) {
+        sum = sum + i;
+        i = i + 1;
+    }
+}
+
+void whileWithComplexCondition() {
+    i = 0;
+    j = 20;
+    
+    while (i < 10 && j > 10) {
+        i = i + 1;
+        j = j - 1;
+    }
+}
+
+void nestedWhile() {
+    i = 0;
+    sum = 0;
+    
+    while (i < 5) {
+        j = 0;
+        while (j < 3) {
+            sum = sum + 1;
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+}
+
+void whileWithIf() {
+    i = 0;
+    count = 0;
+    
+    while (i < 20) {
+        if (i % 2 == 0) {
+            count = count + 1;
+        }
+        i = i + 1;
+    }
+}
+
+void whileWithBreakCondition() {
+    i = 0;
+    sum = 0;
+    
+    while (i < 100) {
+        sum = sum + i;
+        i = i + 1;
+        
+        if (sum > 50) {
+            i = 100;
+        }
+    }
+}
+
+void countDown() {
+    i = 10;
+    
+    while (i > 0) {
+        i = i - 1;
+    }
+}
+
+void complexWhile() {
+    i = 0;
+    j = 0;
+    sum = 0;
+    
+    while (i < 5 || j < 3) {
+        if (i < 5) {
+            i = i + 1;
+            sum = sum + i;
+        }
+        if (j < 3) {
+            j = j + 1;
+            sum = sum + j;
+        }
+    }
+}
+
+int main() {
+    simpleWhile();
+    whileWithComplexCondition();
+    nestedWhile();
+    whileWithIf();
+    whileWithBreakCondition();
+    countDown();
+    complexWhile();
+    return sum;
+}

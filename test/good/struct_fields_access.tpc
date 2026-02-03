@@ -1,0 +1,56 @@
+/* Test d'accès aux champs de structures */
+
+struct point {
+    int x;
+    int y;
+};
+
+struct rectangle {
+    struct point top_left;
+    struct point bottom_right;
+};
+
+struct point p1, p2, p3;
+struct rectangle rect;
+int temp;
+
+void testSimpleAccess() {
+    p1.x = 10;
+    p1.y = 20;
+    
+    p2.x = p1.x + 5;
+    p2.y = p1.y - 3;
+    
+    temp = p1.x + p2.y;
+}
+
+void testNestedAccess() {
+    rect.top_left.x = 0;
+    rect.top_left.y = 100;
+    rect.bottom_right.x = 50;
+    rect.bottom_right.y = 0;
+    
+    temp = rect.top_left.x + rect.bottom_right.x;
+}
+
+void testComplexExpressions() {
+    p3.x = (p1.x + p2.x) * 2;
+    p3.y = p1.y / 2 + p2.y % 3;
+    
+    if (p1.x > p2.x) {
+        p3.x = p1.x;
+    } else {
+        p3.x = p2.x;
+    }
+    
+    while (p1.x < p3.x) {
+        p1.x = p1.x + 1;
+    }
+}
+
+int main() {
+    testSimpleAccess();
+    testNestedAccess();
+    testComplexExpressions();
+    return p3.x;
+}

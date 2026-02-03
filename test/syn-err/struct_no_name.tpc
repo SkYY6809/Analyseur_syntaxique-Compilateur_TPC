@@ -1,0 +1,11 @@
+/* ERREUR : Structure sans nom (interdit) */
+
+/* ERREUR : structure anonyme interdite */
+struct {
+    int x;
+    int y;
+};
+
+int main() {
+    return 0;
+}

@@ -1,0 +1,15 @@
+/* ERREUR : Définition de structure inline dans une autre structure (interdit) */
+
+/* ERREUR : on ne peut pas définir struct inner à l'intérieur de struct outer */
+struct outer {
+    int field1;
+    struct inner {
+        int x;
+        int y;
+    } nested_field;
+    int field2;
+};
+
+int main() {
+    return 0;
+}

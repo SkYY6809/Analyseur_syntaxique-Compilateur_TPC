@@ -1,0 +1,27 @@
+/* ERREUR : Opérateurs incomplets ou mal formés */
+
+int x, y, z;
+
+void testErrors() {
+    /* ERREUR : division sans opérande droit */
+    x = 10 / ;
+    
+    /* ERREUR : modulo sans opérande droit */
+    y = 15 % ;
+    
+    /* ERREUR : multiplication sans opérande gauche */
+    z = * 5;
+    
+    /* ERREUR : négation sans opérande */
+    x = ! ;
+    
+    /* ERREUR : addition incomplète */
+    y = x + ;
+    
+    /* ERREUR : soustraction incomplète */
+    z = - ;
+}
+
+int main() {
+    return 0;
+}

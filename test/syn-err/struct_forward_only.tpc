@@ -1,0 +1,8 @@
+/* ERREUR : Déclaration du nom d'une structure sans ses champs (interdit) */
+
+/* ERREUR : forward declaration interdite - on doit déclarer les champs */
+struct point;
+
+int main() {
+    return 0;
+}

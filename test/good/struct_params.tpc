@@ -1,0 +1,64 @@
+/* Test des structures en paramètres et retour de fonctions */
+
+struct point {
+    int x;
+    int y;
+};
+
+struct circle {
+    struct point center;
+    int radius;
+};
+
+struct point p1, p2;
+struct circle circ;
+int result;
+
+/* Fonction avec structure en paramètre */
+int getX(struct point p) {
+    return p.x;
+}
+
+/* Fonction avec plusieurs paramètres dont structure */
+int distance(int offset_x, struct point p,int offset_y) {
+    int dx, dy;
+    dx = p.x + offset_x;
+    dy = p.y + offset_y;
+    return dx + dy;
+}
+
+/* Fonction retournant une structure */
+struct point createPoint(int x, int y) {
+    struct point p;
+    p.x = x;
+    p.y = y;
+    return p;
+}
+
+/* Fonction avec structure imbriquée en paramètre */
+int getRadius(struct circle c) {
+    return c.radius;
+}
+
+/* Fonction retournant structure imbriquée */
+struct circle createCircle(int x, int y, int r) {
+    struct circle c;
+    c.center.x = x;
+    c.center.y = y;
+    c.radius = r;
+    return c;
+}
+
+
+int main() {
+    p1 = createPoint(10, 20);
+    result = getX(p1);
+    result = distance(p1, 5, 3);
+    
+    circ = createCircle(0, 0, 50);
+    result = getRadius(circ);
+    
+    p2.x = circ.center.x;
+    
+    return result;
+}

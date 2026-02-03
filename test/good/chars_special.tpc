@@ -1,0 +1,76 @@
+/* Test des caractères spéciaux */
+
+char ch1, ch2, ch3, ch4, ch5;
+int result;
+
+void testSpecialChars() {
+    /* Tabulation */
+    ch1 = '\t';
+    
+    /* Saut de ligne */
+    ch2 = '\n';
+    
+    /* Apostrophe échappée */
+    ch3 = '\'';
+    
+    /* Caractères normaux */
+    ch4 = 'A';
+    ch5 = 'z';
+}
+
+void testCharOperations() {
+    ch1 = 'a';
+    ch2 = 'b';
+    
+    /* Comparaisons de caractères */
+    if (ch1 == ch2) {
+        result = 1;
+    }
+    
+    if (ch1 != ch2) {
+        result = 2;
+    }
+    
+    if (ch1 < ch2) {
+        result = 3;
+    }
+}
+
+void testMixedChars() {
+    char space, digit, upper, lower, special;
+    int z;
+    
+    space = ' ';
+    digit = '9';
+    upper = 'Z';
+    lower = 'a';
+    special = '@';
+    
+    /* Utilisation dans conditions */
+    if (digit == '9') {
+        result = 9;
+    }
+    
+    if (upper != lower) {
+        result = 10;
+    }
+}
+
+void testEscapeSequences() {
+    /* Toutes les séquences d'échappement autorisées */
+    char tab, newline, quote;
+    
+    tab = '\t';
+    newline = '\n';
+    quote = '\'';
+    
+    result = 0;
+}
+
+int main() {
+    testSpecialChars();
+    testCharOperations();
+    testMixedChars();
+    testEscapeSequences();
+    return result;
+}

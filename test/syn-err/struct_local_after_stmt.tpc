@@ -1,0 +1,21 @@
+/* ERREUR : Structure locale après une instruction (interdit) */
+
+int x;
+
+void myFunction() {
+    int a;
+    a = 10;
+    
+    /* ERREUR : structure locale ne peut pas être déclarée après une instruction */
+    struct point {
+        int x;
+        int y;
+    };
+    
+    struct point p;
+    p.x = a;
+}
+
+int main() {
+    return 0;
+}

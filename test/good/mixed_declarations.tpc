@@ -1,0 +1,88 @@
+/* Test de déclarations multiples et mixées */
+
+/* Plusieurs structures globales */
+struct point {
+    int x;
+    int y;
+};
+
+struct vector {
+    int dx;
+    int dy;
+};
+
+struct color {
+    char r;
+    char g;
+    char b;
+};
+
+/* Variables globales après structures */
+int a, b, c, d, e;
+char ch1, ch2, ch3;
+
+/* Encore des structures */
+struct rectangle {
+    struct point top_left;
+    struct point bottom_right;
+};
+
+struct circle {
+    struct point center;
+    int radius;
+};
+
+/* Encore des variables */
+int x, y, z;
+
+/* Variables de types structures */
+struct point p1, p2, p3;
+struct vector v1, v2;
+struct color col1, col2;
+
+void testFunction(int param1, int param2, char param3) {
+    /* Variables locales de types simples */
+    int local_a, local_b;
+    char local_c;
+    /* Variables locales de types structures */
+    struct point local_p;
+    struct vector local_v;
+    
+    local_a = param1 + param2;
+    local_b = param1 * param2;
+    local_c = param3;
+    
+    
+    local_p.x = local_a;
+    local_p.y = local_b;
+    local_v.dx = local_a;
+    local_v.dy = local_b;
+}
+
+int main() {
+    /* Initialisation des variables globales */
+    a = 1;
+    b = 2;
+    c = 3;
+    d = 4;
+    e = 5;
+    
+    ch1 = 'A';
+    ch2 = 'B';
+    ch3 = 'C';
+    
+    x = 10;
+    y = 20;
+    z = 30;
+    
+    /* Utilisation des structures */
+    p1.x = x;
+    p1.y = y;
+    v1.dx = a;
+    v1.dy = b;
+    col1.r = ch1;
+    
+    testFunction(a, b, ch1);
+    
+    return x;
+}

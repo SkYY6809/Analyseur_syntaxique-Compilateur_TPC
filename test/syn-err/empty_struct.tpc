@@ -1,0 +1,3 @@
+struct {
+}; 
+/* ERREUR : Structure vide non autorisée */

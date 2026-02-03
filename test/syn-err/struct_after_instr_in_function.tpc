@@ -1,0 +1,9 @@
+void myFunction() {
+    int x = 10;
+    /* Incorrect placement of struct definition */ 
+    struct MyStruct {
+        int a;
+        int b;
+    };
+
+}

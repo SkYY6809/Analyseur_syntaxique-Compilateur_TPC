@@ -1,0 +1,19 @@
+/* ERREUR : Accolades manquantes */
+
+struct point {
+    int x;
+    int y;
+/* ERREUR : accolade fermante manquante */
+
+void myFunction() {
+    int a;
+    a = 10;
+    
+    if (a > 5) {
+        a = 0;
+    /* ERREUR : accolade fermante manquante pour le if */
+/* ERREUR : accolade fermante manquante pour la fonction */
+
+int main() {
+    return 0;
+}

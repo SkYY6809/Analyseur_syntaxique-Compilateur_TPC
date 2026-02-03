@@ -1,0 +1,2 @@
+struct point { int x; int y; };
+void func(struct point p, int a, int b) { }

@@ -1,0 +1,60 @@
+/* Test des structures locales */
+
+int global_x;
+
+void functionWithLocalStruct() {
+    /* Structure locale définie dans la fonction */
+    struct local_point {
+        int x;
+        int y;
+    };
+    
+    struct local_point lp;
+    
+    lp.x = 10;
+    lp.y = 20;
+    global_x = lp.x + lp.y;
+}
+
+void anotherFunction() {
+    /* Autre structure locale avec même nom mais portée différente */
+    struct local_data {
+        char c;
+        int value;
+    };
+    
+    struct local_data data;
+    data.c = 'A';
+    data.value = 42;
+    
+    global_x = data.value;
+}
+
+void nestedLocalStruct() {
+    /* Structure locale */
+    struct inner {
+        int field1;
+    };
+    
+    /* Autre structure locale utilisant la première */
+    struct outer {
+        struct inner nested;
+        int field2;
+    };
+    
+    struct outer o;
+    struct inner i;
+    
+    i.field1 = 5;
+    o.nested.field1 = 10;
+    o.field2 = 15;
+    
+    global_x = o.nested.field1 + o.field2;
+}
+
+int main() {
+    functionWithLocalStruct();
+    anotherFunction();
+    nestedLocalStruct();
+    return global_x;
+}

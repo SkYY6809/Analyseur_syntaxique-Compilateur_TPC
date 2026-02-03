@@ -1,0 +1,12 @@
+/* ERREUR : Déclaration de variable en même temps que la structure (interdit) */
+
+/* ERREUR : on ne peut pas déclarer p en même temps que struct point */
+struct point {
+    int x;
+    int y;
+} p;
+
+int main() {
+    p.x = 10;
+    return 0;
+}

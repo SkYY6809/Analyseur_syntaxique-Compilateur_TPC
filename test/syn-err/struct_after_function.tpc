@@ -1,0 +1,17 @@
+/* ERREUR : Structure globale après une fonction (interdit) */
+
+int x;
+
+void myFunction() {
+    x = 10;
+}
+
+/* ERREUR : cette structure ne peut pas être déclarée ici */
+struct point {
+    int x;
+    int y;
+};
+
+int main() {
+    return 0;
+}
