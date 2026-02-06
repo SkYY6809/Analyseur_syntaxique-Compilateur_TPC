@@ -498,6 +498,8 @@ char *yytext;
 #line 2 "src/lex_proj.lex"
 #include "tree.h"
 #include "bison_proj.h"
+#include "compiler.h"
+#include "semantique.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -508,9 +510,9 @@ char current_line[1024];
 
 extern Node * root;
 
-#line 512 "obj/lex_proj.c"
-
 #line 514 "obj/lex_proj.c"
+
+#line 516 "obj/lex_proj.c"
 
 #define INITIAL 0
 #define COMMENT 1
@@ -728,10 +730,10 @@ YY_DECL
 		}
 
 	{
-#line 18 "src/lex_proj.lex"
+#line 20 "src/lex_proj.lex"
 
 
-#line 735 "obj/lex_proj.c"
+#line 737 "obj/lex_proj.c"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -790,143 +792,143 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 20 "src/lex_proj.lex"
+#line 22 "src/lex_proj.lex"
 { BEGIN(COMMENT); }
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 21 "src/lex_proj.lex"
+#line 23 "src/lex_proj.lex"
 { BEGIN(INITIAL); }
 	YY_BREAK
 case 3:
 /* rule 3 can match eol */
 YY_RULE_SETUP
-#line 22 "src/lex_proj.lex"
+#line 24 "src/lex_proj.lex"
 { lineno++; }
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 23 "src/lex_proj.lex"
+#line 25 "src/lex_proj.lex"
 ;
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 25 "src/lex_proj.lex"
+#line 27 "src/lex_proj.lex"
 ;
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 30 "src/lex_proj.lex"
+#line 32 "src/lex_proj.lex"
 { yylval.ident = strdup(yytext); return TYPE; }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 31 "src/lex_proj.lex"
+#line 33 "src/lex_proj.lex"
 { return VOID; }
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 32 "src/lex_proj.lex"
+#line 34 "src/lex_proj.lex"
 { return IF; }
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 33 "src/lex_proj.lex"
+#line 35 "src/lex_proj.lex"
 { return ELSE; }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 34 "src/lex_proj.lex"
+#line 36 "src/lex_proj.lex"
 { return RETURN; }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 35 "src/lex_proj.lex"
+#line 37 "src/lex_proj.lex"
 { return WHILE; }
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 36 "src/lex_proj.lex"
+#line 38 "src/lex_proj.lex"
 { return STRUCT; }
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 39 "src/lex_proj.lex"
+#line 41 "src/lex_proj.lex"
 { yylval.ident = strdup(yytext); return EQ; }
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 40 "src/lex_proj.lex"
+#line 42 "src/lex_proj.lex"
 { yylval.ident = strdup(yytext); return ORDER; }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 41 "src/lex_proj.lex"
+#line 43 "src/lex_proj.lex"
 { yylval.ident = strdup(yytext); return ADDSUB; }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 42 "src/lex_proj.lex"
+#line 44 "src/lex_proj.lex"
 { yylval.ident = strdup(yytext); return DIVSTAR; }
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 43 "src/lex_proj.lex"
+#line 45 "src/lex_proj.lex"
 { yylval.ident = strdup(yytext); return OR; }
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 44 "src/lex_proj.lex"
+#line 46 "src/lex_proj.lex"
 { yylval.ident = strdup(yytext); return AND; }
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 47 "src/lex_proj.lex"
+#line 49 "src/lex_proj.lex"
 { return ','; }
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 48 "src/lex_proj.lex"
+#line 50 "src/lex_proj.lex"
 { return ';'; }
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 49 "src/lex_proj.lex"
+#line 51 "src/lex_proj.lex"
 { return '='; }
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 50 "src/lex_proj.lex"
+#line 52 "src/lex_proj.lex"
 { return '('; }
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 51 "src/lex_proj.lex"
+#line 53 "src/lex_proj.lex"
 { return ')'; }
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 52 "src/lex_proj.lex"
+#line 54 "src/lex_proj.lex"
 { return '{'; }
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 53 "src/lex_proj.lex"
+#line 55 "src/lex_proj.lex"
 { return '}'; }
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 54 "src/lex_proj.lex"
+#line 56 "src/lex_proj.lex"
 { return '.'; }
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 55 "src/lex_proj.lex"
+#line 57 "src/lex_proj.lex"
 { return '!'; }
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 58 "src/lex_proj.lex"
+#line 60 "src/lex_proj.lex"
 {
                             yylval.num = atoi(yytext); 
                             return NUM; 
@@ -935,7 +937,7 @@ YY_RULE_SETUP
 case 29:
 /* rule 29 can match eol */
 YY_RULE_SETUP
-#line 63 "src/lex_proj.lex"
+#line 65 "src/lex_proj.lex"
 {
                                 if (yytext[1] == '\\') {
                                     if (yytext[2] == 'n') yylval.character = '\n';
@@ -949,7 +951,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 75 "src/lex_proj.lex"
+#line 77 "src/lex_proj.lex"
 {
                             yylval.ident = strdup(yytext); 
                             return IDENT; 
@@ -958,17 +960,17 @@ YY_RULE_SETUP
 case 31:
 /* rule 31 can match eol */
 YY_RULE_SETUP
-#line 81 "src/lex_proj.lex"
+#line 83 "src/lex_proj.lex"
 {lineno++;}
 	YY_BREAK
 case 32:
 YY_RULE_SETUP
-#line 83 "src/lex_proj.lex"
+#line 85 "src/lex_proj.lex"
 ;
 	YY_BREAK
 case 33:
 YY_RULE_SETUP
-#line 86 "src/lex_proj.lex"
+#line 88 "src/lex_proj.lex"
 {
                             fprintf(stderr,"Erreur lexicale ligne %d : %s\n", lineno, yytext);
                             return LEX_ERROR;
@@ -976,10 +978,10 @@ YY_RULE_SETUP
 	YY_BREAK
 case 34:
 YY_RULE_SETUP
-#line 91 "src/lex_proj.lex"
+#line 93 "src/lex_proj.lex"
 ECHO;
 	YY_BREAK
-#line 983 "obj/lex_proj.c"
+#line 985 "obj/lex_proj.c"
 case YY_STATE_EOF(INITIAL):
 case YY_STATE_EOF(COMMENT):
 	yyterminate();
@@ -1985,7 +1987,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 91 "src/lex_proj.lex"
+#line 93 "src/lex_proj.lex"
 
 
 void print_help(void) {
@@ -2028,7 +2030,14 @@ int main(int argc, char **argv) {
         if(tree && root){
             printf("Affichage de l'arbre abstrait \n");
             printTree(root);
-            deleteTree(root);
+        }
+        if(root) {
+            printf("je passe par la ou je suis fou ?\n");
+            Table_symb * tableGlobale = NULL;
+            analyse_semantique(root, &tableGlobale); // On lance le parcours
+            printf("--- Table Globale ---\n");
+            printT(tableGlobale);
+            freeTable(tableGlobale);
         }
         printf("Analyse syntaxique réussie !\n");
         return 0;
@@ -2036,5 +2045,7 @@ int main(int argc, char **argv) {
     else{
         return 1;
     }
+
+
 }
 

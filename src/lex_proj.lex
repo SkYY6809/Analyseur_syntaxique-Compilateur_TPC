@@ -2,6 +2,7 @@
 #include "tree.h"
 #include "bison_proj.h"
 #include "compiler.h"
+#include "semantique.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -133,6 +134,7 @@ int main(int argc, char **argv) {
             printTree(root);
         }
         if(root) {
+            printf("je passe par la ou je suis fou ?\n");
             Table_symb * tableGlobale = NULL;
             analyse_semantique(root, &tableGlobale); // On lance le parcours
             printf("--- Table Globale ---\n");
