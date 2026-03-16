@@ -14,7 +14,11 @@ char* getTypeString(Node* typeNode) {
     }
 }
 
-void analyse_semantique(Node * node, Table_symb ** tableCourante) {
+void translate_to_asm(Node * node){
+
+}
+
+void analyse_semantique(Node * node, Table_symb ** tableCourante, FILE * anonym) {
     if (node == NULL) return;
 
     switch(node->label) {
@@ -49,6 +53,8 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante) {
             Node * nomFonct = typeRetour->nextSibling;
             Node * params = nomFonct->nextSibling;
 
+            if (strcmp(nomFonct->value, "main") == 0)
+                fwrite("global _start\nsection .text\n_start:\n", sizeof("global _start\nsection .text\n_start:\n"), 1, anonym);
             printf("\n>>> Analyse de la fonction : %s\n", nomFonct->value);
 
             Node * param = params->firstChild;
@@ -60,7 +66,7 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante) {
                 param = param->nextSibling;
             }
 
-            analyse_semantique(corps, &tableLocale);
+            analyse_semantique(corps, &tableLocale, anonym);
 
             printf("--- Table des symboles (Locals + Params) pour '%s' ---\n", nomFonct->value);
             printT(tableLocale);
@@ -69,10 +75,15 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante) {
             break;
         }
 
+        case L_ASSIGN: {
+            Node * child ;
+
+        }
+
         default: {
             Node * child = node->firstChild;
             while (child != NULL) {
-                analyse_semantique(child, tableCourante);
+                analyse_semantique(child, tableCourante, anonym);
                 child = child->nextSibling;
             }
             break;

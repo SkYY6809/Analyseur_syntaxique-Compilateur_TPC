@@ -133,15 +133,18 @@ int main(int argc, char **argv) {
             printf("Affichage de l'arbre abstrait \n");
             printTree(root);
         }
+        FILE * anonym = fopen("src/_anonymous.asm", "w"); //création de l'assembleur
+        
+
         if(root) {
-            printf("je passe par la ou je suis fou ?\n");
             Table_symb * tableGlobale = NULL;
-            analyse_semantique(root, &tableGlobale); // On lance le parcours
+            analyse_semantique(root, &tableGlobale, anonym); // On lance le parcours
             printf("--- Table Globale ---\n");
             printT(tableGlobale);
             freeTable(tableGlobale);
         }
         printf("Analyse syntaxique réussie !\n");
+        fclose(anonym); //fermeture de l'assembleur
         return 0;
     }
     else{
