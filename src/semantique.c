@@ -14,8 +14,8 @@ char* getTypeString(Node* typeNode) {
     }
 }
 
-void translate_to_asm(Node * node){
-
+void translate_to_asm(Node * node, FILE * anonym){
+        
 }
 
 void analyse_semantique(Node * node, Table_symb ** tableCourante, FILE * anonym) {
@@ -43,37 +43,49 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante, FILE * anonym)
         }
 
         case L_DECL_FONCT: {
-            Table_symb * tableLocale = NULL;
-            
+                    Table_symb * tableLocale = NULL;
 
-            Node * entete = node->firstChild; 
-            Node * corps = entete->nextSibling;
+                    Node * entete = node->firstChild; 
+                    Node * corps = entete->nextSibling;
 
-            Node * typeRetour = entete->firstChild;
-            Node * nomFonct = typeRetour->nextSibling;
-            Node * params = nomFonct->nextSibling;
+                    Node * typeRetour = entete->firstChild;
+                    Node * nomFonct = typeRetour->nextSibling;
+                    Node * params = nomFonct->nextSibling;
 
-            if (strcmp(nomFonct->value, "main") == 0)
-                fwrite("global _start\nsection .text\n_start:\n", sizeof("global _start\nsection .text\n_start:\n"), 1, anonym);
-            printf("\n>>> Analyse de la fonction : %s\n", nomFonct->value);
+                    // --- 1. PROLOGUE (Avant l'analyse du corps) ---
+                    if (strcmp(nomFonct->value, "main") == 0){
+                        fprintf(anonym, "global _start\n");
+                        fprintf(anonym, "section .text\n");
+                        fprintf(anonym, "_start:\n");
+                    }
+                    printf("\n>>> Analyse de la fonction : %s\n", nomFonct->value);
 
-            Node * param = params->firstChild;
-            while(param != NULL) {
-                Node * typeParam = param->firstChild;
-                Node * nomParam = typeParam->nextSibling;
-                
-                add(&tableLocale, getTypeString(typeParam), nomParam->value);
-                param = param->nextSibling;
-            }
+                    // --- 2. GESTION DES PARAMÈTRES ---
+                    Node * param = params->firstChild;
+                    while(param != NULL) {
+                        Node * typeParam = param->firstChild;
+                        Node * nomParam = typeParam->nextSibling;
+                        
+                        add(&tableLocale, getTypeString(typeParam), nomParam->value);
+                        param = param->nextSibling;
+                    }
 
-            analyse_semantique(corps, &tableLocale, anonym);
+                    // --- 3. ANALYSE DU CORPS ---
+                    analyse_semantique(corps, &tableLocale, anonym);
 
-            printf("--- Table des symboles (Locals + Params) pour '%s' ---\n", nomFonct->value);
-            printT(tableLocale);
-            
-            freeTable(tableLocale); 
-            break;
-        }
+                    // --- 4. ÉPILOGUE (Après l'analyse du corps) ---
+                    if (strcmp(nomFonct->value, "main") == 0){
+                        fprintf(anonym, "    mov rax, 60\n");
+                        fprintf(anonym, "    mov rdi, 0\n");
+                        fprintf(anonym, "    syscall\n");
+                    }
+
+                    printf("--- Table des symboles (Locals + Params) pour '%s' ---\n", nomFonct->value);
+                    printT(tableLocale);
+                    
+                    freeTable(tableLocale); 
+                    break;
+                }
 
         case L_ASSIGN: {
             Node * child ;
