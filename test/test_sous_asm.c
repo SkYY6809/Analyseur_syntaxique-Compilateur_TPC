@@ -1,4 +1,6 @@
+int b;
 int main(){
-    int a ;
-    a = 5+6*9;
+    int a, c ;
+    a = 2;
+    c = 6-a;
 }

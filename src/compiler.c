@@ -38,7 +38,7 @@ int add(Table_symb ** tab, char * type, char * ident){
 
 void printT(Table_symb * t){
     for(;t ;t = t->suiv)
-        printf("%s %s \n", t->type, t->ident);
+        printf("Type : %s, Identificateur : %s \n", t->type, t->ident);
 }
 
 void freeTable(Table_symb * t) {

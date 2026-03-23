@@ -14,8 +14,55 @@ char* getTypeString(Node* typeNode) {
     }
 }
 
-void translate_to_asm(Node * node, FILE * anonym){
-        
+void translate_to_asm(Node * node, FILE * anonym){   // PROBLEME : SI VARIABLE INIT AVANT CALCULE QUI EST DANS LE CALCUL, RESULTAT FAUX !!!!!
+        if(!node) return;
+        switch (node->label){
+            case L_NUM :{
+                fprintf(anonym, "\tpush %s\n", node->value);
+                break;
+            }
+            case L_SUB:{
+                Node * left = node->firstChild;
+                Node * right = left->nextSibling;
+                translate_to_asm(left, anonym);
+                translate_to_asm(right, anonym);
+                fprintf(anonym, "\tpop rbx\n");
+                fprintf(anonym, "\tpop rax\n");
+                fprintf(anonym, "\tsub rax, rbx\n");
+                fprintf(anonym,"\tpush rax\n");
+                break;
+            }
+            case L_ADD:{
+                Node * left = node->firstChild;
+                Node * right = left->nextSibling;
+                translate_to_asm(left, anonym);
+                translate_to_asm(right, anonym);
+                fprintf(anonym, "\tpop rbx\n");
+                fprintf(anonym, "\tpop rax\n");
+                fprintf(anonym, "\tadd rax, rbx\n");
+                fprintf(anonym,"\tpush rax\n");
+                break;
+            }
+            case L_MUL:{
+                Node * left = node->firstChild;
+                Node * right = left->nextSibling;
+                translate_to_asm(left, anonym);
+                translate_to_asm(right, anonym);
+                fprintf(anonym, "\tpop rbx\n");
+                fprintf(anonym, "\tpop rax\n");
+                fprintf(anonym, "\timul rax, rbx\n");
+                fprintf(anonym,"\tpush rax\n");
+                break;
+            }
+            default:{
+                Node * child = node->firstChild;
+                while(child){
+                    translate_to_asm(child, anonym);
+                    child = child->nextSibling;
+                }
+                break;
+            }
+        }
 }
 
 void analyse_semantique(Node * node, Table_symb ** tableCourante, FILE * anonym) {
@@ -52,7 +99,7 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante, FILE * anonym)
                     Node * nomFonct = typeRetour->nextSibling;
                     Node * params = nomFonct->nextSibling;
 
-                    // --- 1. PROLOGUE (Avant l'analyse du corps) ---
+                    // en tete de l'assambleur si y'a un main
                     if (strcmp(nomFonct->value, "main") == 0){
                         fprintf(anonym, "global _start\n");
                         fprintf(anonym, "section .text\n");
@@ -60,7 +107,7 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante, FILE * anonym)
                     }
                     printf("\n>>> Analyse de la fonction : %s\n", nomFonct->value);
 
-                    // --- 2. GESTION DES PARAMÈTRES ---
+                    // parametres
                     Node * param = params->firstChild;
                     while(param != NULL) {
                         Node * typeParam = param->firstChild;
@@ -70,14 +117,15 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante, FILE * anonym)
                         param = param->nextSibling;
                     }
 
-                    // --- 3. ANALYSE DU CORPS ---
+                    // corps
                     analyse_semantique(corps, &tableLocale, anonym);
+                    translate_to_asm(corps, anonym);
 
-                    // --- 4. ÉPILOGUE (Après l'analyse du corps) ---
+                    // fin de m'assembleur si y'a main
                     if (strcmp(nomFonct->value, "main") == 0){
-                        fprintf(anonym, "    mov rax, 60\n");
-                        fprintf(anonym, "    mov rdi, 0\n");
-                        fprintf(anonym, "    syscall\n");
+                        fprintf(anonym, "\tmov rax, 60\n");
+                        fprintf(anonym, "\tmov rdi, 0\n");
+                        fprintf(anonym, "\tsyscall\n");
                     }
 
                     printf("--- Table des symboles (Locals + Params) pour '%s' ---\n", nomFonct->value);
@@ -87,10 +135,6 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante, FILE * anonym)
                     break;
                 }
 
-        case L_ASSIGN: {
-            Node * child ;
-
-        }
 
         default: {
             Node * child = node->firstChild;
