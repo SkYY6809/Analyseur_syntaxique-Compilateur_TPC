@@ -14,7 +14,7 @@ char* getTypeString(Node* typeNode) {
     }
 }
 
-void translate_to_asm(Node * node, FILE * anonym){   // PROBLEME : SI VARIABLE INIT AVANT CALCULE QUI EST DANS LE CALCUL, RESULTAT FAUX !!!!!
+void translate_to_asm(Node * node, FILE * anonym){  
         if(!node) return;
         switch (node->label){
             case L_NUM :{
