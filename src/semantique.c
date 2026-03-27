@@ -67,6 +67,7 @@ void translate_to_asm(Node * node, FILE * anonym){
 
 void analyse_semantique(Node * node, Table_symb ** tableCourante, FILE * anonym) {
     if (node == NULL) return;
+    Table_symb * tableLocale = NULL;
 
     switch(node->label) {
 
@@ -80,7 +81,7 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante, FILE * anonym)
             Node *varNode = typeNode->nextSibling;
             while (varNode != NULL) {
 
-                if (add(tableCourante, typeStr, varNode->value) == 0) {
+                if (add(&tableLocale, typeStr, varNode->value) == 0) {
                     fprintf(stderr, "Erreur sémantique ligne %d: Variable '%s' déjà déclarée.\n", 
                             node->lineno, varNode->value);
                 }
@@ -90,51 +91,87 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante, FILE * anonym)
         }
 
         case L_DECL_FONCT: {
-                    Table_symb * tableLocale = NULL;
 
-                    Node * entete = node->firstChild; 
-                    Node * corps = entete->nextSibling;
+            Node * entete = node->firstChild; 
+            Node * corps = entete->nextSibling;
 
-                    Node * typeRetour = entete->firstChild;
-                    Node * nomFonct = typeRetour->nextSibling;
-                    Node * params = nomFonct->nextSibling;
+            Node * typeRetour = entete->firstChild;
+            Node * nomFonct = typeRetour->nextSibling;
+            Node * params = nomFonct->nextSibling;
 
-                    // en tete de l'assambleur si y'a un main
-                    if (strcmp(nomFonct->value, "main") == 0){
-                        fprintf(anonym, "global _start\n");
-                        fprintf(anonym, "section .text\n");
-                        fprintf(anonym, "_start:\n");
-                    }
-                    printf("\n>>> Analyse de la fonction : %s\n", nomFonct->value);
-
-                    // parametres
-                    Node * param = params->firstChild;
-                    while(param != NULL) {
-                        Node * typeParam = param->firstChild;
-                        Node * nomParam = typeParam->nextSibling;
-                        
-                        add(&tableLocale, getTypeString(typeParam), nomParam->value);
-                        param = param->nextSibling;
-                    }
-
-                    // corps
-                    analyse_semantique(corps, &tableLocale, anonym);
-                    translate_to_asm(corps, anonym);
-
-                    // fin de m'assembleur si y'a main
-                    if (strcmp(nomFonct->value, "main") == 0){
-                        fprintf(anonym, "\tmov rax, 60\n");
-                        fprintf(anonym, "\tmov rdi, 0\n");
-                        fprintf(anonym, "\tsyscall\n");
-                    }
-
-                    printf("--- Table des symboles (Locals + Params) pour '%s' ---\n", nomFonct->value);
-                    printT(tableLocale);
-                    
-                    freeTable(tableLocale); 
-                    break;
+            if(isInTable(nomFonct->value, *tableCourante)){
+                fprintf(stderr, "Erreur sémantique ligne %d: Fonction '%s' déjà déclarée.\n", 
+                            node->lineno, nomFonct->value);
+                //exit(EXIT_FAILURE);
                 }
+            else{
+                add(tableCourante, getTypeString(typeRetour), nomFonct->value);
+            }
 
+            // en tete de l'assambleur si y'a un main
+            if (strcmp(nomFonct->value, "main") == 0){
+                fprintf(anonym, "global _start\n");
+                fprintf(anonym, "section .text\n");
+                fprintf(anonym, "_start:\n");
+            }
+            printf("\n>>> Analyse de la fonction : %s\n", nomFonct->value);
+
+            // parametres
+            Node * param = params->firstChild;
+            while(param != NULL) {
+                Node * typeParam = param->firstChild;
+                Node * nomParam = typeParam->nextSibling;
+                
+                add(&tableLocale, getTypeString(typeParam), nomParam->value);
+                param = param->nextSibling;
+            }
+
+            // corps
+            analyse_semantique(corps, &tableLocale, anonym);
+            translate_to_asm(corps, anonym);
+
+            // fin de m'assembleur si y'a main
+            if (strcmp(nomFonct->value, "main") == 0){
+                fprintf(anonym, "\tmov rax, 60\n");
+                fprintf(anonym, "\tmov rdi, 0\n");
+                fprintf(anonym, "\tsyscall\n");
+            }
+
+            printf("--- Table des symboles (Locals + Params) pour '%s' ---\n", nomFonct->value);
+            printT(tableLocale);
+            
+            freeTable(tableLocale); 
+            break;
+        }
+
+        case L_ASSIGN: {
+            Node * ident = node->firstChild;
+            if(!isInTable(ident->value, tableLocale)){
+                fprintf(stderr, "Erreur sémantique ligne %d: Variable '%s' non déclarée.\n", 
+                            node->lineno, ident->value);
+                //exit(EXIT_FAILURE);
+                }
+        }
+
+        case L_CALL: {
+            Node * nom = node->firstChild;
+            Node * args = node->nextSibling;
+            if(!isInTable(nom->value, *tableCourante)){
+                fprintf(stderr, "Erreur sémantique ligne %d: Fonction '%s' non déclarée.\n", 
+                            node->lineno, nom->value);
+                ////exit(EXIT_FAILURE);
+                }
+            /*
+            while(args){
+                if(!isInTable(args->value, *tableCourante)){
+                fprintf(stderr, "Erreur sémantique ligne %d: Variable '%s' non déclarée.\n", 
+                            node->lineno, args->value);
+                exit(EXIT_FAILURE);
+                }
+                args = args->firstChild;
+            }*/
+            
+        }
 
         default: {
             Node * child = node->firstChild;

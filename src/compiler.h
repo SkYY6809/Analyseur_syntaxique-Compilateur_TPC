@@ -13,7 +13,7 @@ typedef struct Case {
 
 Table_symb * makeCase(char * type, char * ident);
 
-int isInTable(char * type, char * ident, Table_symb * t);
+int isInTable(char * ident, Table_symb * t);
 
 int add(Table_symb ** tab, char * type, char * ident);
 

@@ -143,7 +143,6 @@ int main(int argc, char **argv) {
             printT(tableGlobale);
             freeTable(tableGlobale);
         }
-        printf("Analyse syntaxique réussie !\n");
         fclose(anonym); //fermeture de l'assembleur
         return 0;
     }

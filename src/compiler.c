@@ -12,7 +12,7 @@ Table_symb * makeCase(char * type, char * ident){
     return t;
 }
 
-int isInTable(char * type, char * ident, Table_symb * t){
+int isInTable(char * ident, Table_symb * t){
     for(;t; t = t->suiv){
         if(strcmp(t->ident, ident) == 0)
             return 1;
@@ -26,7 +26,7 @@ int add(Table_symb ** tab, char * type, char * ident){
         return 1;
     }
 
-    if(isInTable(ident, type, *tab)) return 0;
+    if(isInTable(ident, *tab)) return 0;
 
     Table_symb * cur = *tab;
     while(cur->suiv != NULL) cur = cur->suiv;
