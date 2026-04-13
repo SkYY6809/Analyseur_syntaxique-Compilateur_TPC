@@ -4,6 +4,6 @@
 #include "tree.h"
 #include "compiler.h"
 
-void analyse_semantique(Node * node, Table_symb ** tableCourante, FILE * anonym);
+void analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** tableGlobale, FILE * anonym);
 
 #endif

@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "*.py": "python",
-        "compiler.h": "c"
+        "compiler.h": "c",
+        "tree.h": "c"
     }
 }

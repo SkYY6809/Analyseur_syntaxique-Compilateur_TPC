@@ -138,8 +138,8 @@ int main(int argc, char **argv) {
 
         if(root) {
             Table_symb * tableGlobale = NULL;
-            analyse_semantique(root, &tableGlobale, anonym); // On lance le parcours
-            printf("--- Table Globale ---\n");
+            analyse_semantique(root, &tableGlobale, NULL, anonym); // On lance le parcours
+            printf("\n--- Table Globale ---\n");
             printT(tableGlobale);
             freeTable(tableGlobale);
         }
