@@ -64,126 +64,87 @@ void translate_to_asm(Node * node, FILE * anonym){
             }
         }
 }
-char* labelToString(label_t label) {
-    switch(label) {
-        case L_PROG: return "L_PROG";
-        case L_DECL_STRUCT: return "L_DECL_STRUCT";
-        case L_DECL_VAR: return "L_DECL_VAR";
-        case L_DECL_FONCT: return "L_DECL_FONCT";
-        case L_CHAMPS: return "L_CHAMPS";
-        case L_CHAMP: return "L_CHAMP";
-
-        case L_TYPE_INT: return "L_TYPE_INT";
-        case L_TYPE_VOID: return "L_TYPE_VOID";
-        case L_TYPE_CHAR: return "L_TYPE_CHAR";
-        case L_TYPE_STRUCT: return "L_TYPE_STRUCT";
-
-        case L_ENTETE_FONCT: return "L_ENTETE_FONCT";
-        case L_PARAMETRES: return "L_PARAMETRES";
-        case L_PARAM: return "L_PARAM";
-
-        case L_CORPS: return "L_CORPS";
-        case L_ASSIGN: return "L_ASSIGN";
-        case L_FIELD_ASSIGN: return "L_FIELD_ASSIGN";
-        case L_IF: return "L_IF";
-        case L_IF_ELSE: return "L_IF_ELSE";
-        case L_WHILE: return "L_WHILE";
-        case L_RETURN: return "L_RETURN";
-        case L_CALL: return "L_CALL";
-        case L_BLOCK: return "L_BLOCK";
-
-        case L_OR: return "L_OR";
-        case L_AND: return "L_AND";
-        case L_EQ: return "L_EQ";
-        case L_NEQ: return "L_NEQ";
-        case L_LT: return "L_LT";
-        case L_GT: return "L_GT";
-        case L_LE: return "L_LE";
-        case L_GE: return "L_GE";
-        case L_ADD: return "L_ADD";
-        case L_SUB: return "L_SUB";
-        case L_MUL: return "L_MUL";
-        case L_DIV: return "L_DIV";
-        case L_MOD: return "L_MOD";
-        case L_NOT: return "L_NOT";
-        case L_NEG: return "L_NEG";
-
-        case L_IDENT: return "L_IDENT";
-        case L_NUM: return "L_NUM";
-        case L_CHAR: return "L_CHAR";
-        case L_FIELD_ACCESS: return "L_FIELD_ACCESS";
-
-        case L_DECLARATEURS: return "L_DECLARATEURS";
-        case L_ARGUMENTS: return "L_ARGUMENTS";
-
-        default: return "UNKNOWN";
-    }
-}
 
 static int isInAnyTable(char * ident, Table_symb * locale, Table_symb * globale) {
     return isInTable(ident, locale) || isInTable(ident, globale);
 }
 
-void warningType(char * type_ident, char * type_value){
+void warningType(char * type_ident, char * type_value, int ligne){
     if(strcmp(type_ident, "int") == 0 && strcmp(type_value, "char") == 0)
-        printf("Warning : Vous assegnez un char à un int");
+        printf("Warning ligne %d : Vous assegnez un char à un int\n", ligne);
 }
 
+static char* getExprType(Node * node, Table_symb * tableCourante, Table_symb * tableGlobale) {
+    if (!node) return NULL;
+ 
+    switch (node->label) {
+        case L_NUM:
+            return "int";
+        case L_CHAR:
+            return "char";
+ 
+        case L_IDENT: {
+            /* cherche en local d'abord, puis global */
+            for (Table_symb *t = tableCourante; t; t = t->suiv)
+                if (strcmp(t->ident, node->value) == 0) return t->type;
+            for (Table_symb *t = tableGlobale; t; t = t->suiv)
+                if (strcmp(t->ident, node->value) == 0) return t->type;
+            return NULL;
+        }
+ 
+        case L_CALL: {
+            /* type de retour = type enregistré dans la table pour le nom de la fonction */
+            const char *fname = node->firstChild->value;
+            for (Table_symb *t = tableCourante; t; t = t->suiv)
+                if (strcmp(t->ident, fname) == 0) return t->type;
+            for (Table_symb *t = tableGlobale; t; t = t->suiv)
+                if (strcmp(t->ident, fname) == 0) return t->type;
+            return NULL;
+        }
+ 
+        /* Opérations arithmétiques : le type dominant est int,
+           sauf si les deux opérandes sont char → résultat char */
+        case L_ADD: case L_SUB: case L_MUL: case L_DIV: case L_MOD:
+        case L_NEG: {
+            char *left  = getExprType(node->firstChild, tableCourante, tableGlobale);
+            char *right = node->firstChild
+                          ? getExprType(node->firstChild->nextSibling, tableCourante, tableGlobale)
+                          : NULL;
+            if (left && right) {
+                if (strcmp(left, "int") == 0 || strcmp(right, "int") == 0)
+                    return "int";
+                return left; /* les deux sont char */
+            }
+            return left ? left : right;
+        }
+ 
+        /* Opérations logiques/comparaisons → résultat entier (0 ou 1) */
+        case L_OR: case L_AND: case L_NOT:
+        case L_EQ: case L_NEQ:
+        case L_LT: case L_GT: case L_LE: case L_GE:
+            return "int";
+ 
+        default:
+            return NULL;
+    }
+}
 
-//passer par les label et pas par les les values belek sa fonctionnera
 int isSameType(Node * ident, Node * value, Table_symb * tableCourante, Table_symb * tableGlobale){
-    char * type_ident; 
-    char * type_value;
-    
-    if(value->label != L_CALL) {
-        //si valeur n'est pas une fonction
-        
-        //parcours sur tableCourante
-        for(;tableCourante; tableCourante= tableCourante->suiv){
-            //verif pour ident
-            if(strcmp(tableCourante->ident, ident->value) == 0)
-                type_ident = tableCourante->type;
-                //verif pour value
-            if(strcmp(tableCourante->ident, value->value) == 0)
-                type_value = tableCourante->type;
-        }
-    
-        //parcours sur tableGlobale
-        for(;tableGlobale; tableGlobale= tableGlobale->suiv){
-            //verif pour ident
-            if(strcmp(tableGlobale->ident, ident->value) == 0)
-                type_ident= tableGlobale->type;
-            //verif pour value
-            if(strcmp(tableGlobale->ident, value->value) == 0)
-                type_value = tableGlobale->type;
-        }
-    }
-    else{
-        //si valeur est une fonction
-
-        //parcours tableCourante    return (strcmp(type_ident, type_value)==0 || (strcmp(type_ident, "int") == 0 && strcmp(type_value, "char") == 0));
-        for(;tableCourante; tableCourante= tableCourante->suiv){
-            //verif pour ident
-            if(strcmp(tableCourante->ident, ident->value) == 0)
-                type_ident = tableCourante->type;
-            //verif pour value
-            if(strcmp(tableCourante->ident, value->firstChild->value) == 0)
-                type_value = tableCourante->type;
-        }
-    
-        //parcours tableGlobal
-        for(;tableGlobale; tableGlobale= tableGlobale->suiv){
-            //verif pour ident
-            if(strcmp(tableGlobale->ident, ident->value) == 0)
-                type_ident= tableGlobale->type;
-            //verif pour value
-            if(strcmp(tableGlobale->ident, value->firstChild->value) == 0)
-                type_value = tableGlobale->type;
-        }
-    }
-    printf("SCOOBYDOO BY DOOO %s AHHHHHHHHHHHHHHHH %s", type_ident, type_value);
-    warningType(type_ident, type_value);
-    return (strcmp(type_ident, type_value)==0 || (strcmp(type_ident, "int") == 0 && strcmp(type_value, "char") == 0));
+    char * type_ident = NULL;
+ 
+    // Cherche le type de la variable à gauche du =
+    for (Table_symb * t = tableCourante; t; t = t->suiv)
+        if (strcmp(t->ident, ident->value) == 0) { type_ident = t->type; break; }
+    if (!type_ident)
+        for (Table_symb * t = tableGlobale; t; t = t->suiv)
+            if (strcmp(t->ident, ident->value) == 0) { type_ident = t->type; break; }
+ 
+    // Déduit le type de l'expression à droite du =
+    char * type_value = getExprType(value, tableCourante, tableGlobale);
+ 
+    warningType(type_ident, type_value, value->lineno);
+    return (strcmp(type_ident, type_value) == 0
+            || (strcmp(type_ident, "int") == 0 && strcmp(type_value, "char") == 0));
 }
 
 void analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** tableGlobale, FILE * anonym) {
