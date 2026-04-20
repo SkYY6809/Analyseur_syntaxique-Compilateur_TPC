@@ -1,25 +1,23 @@
-CC = gcc
+CC     = gcc
 CFLAGS = -Wall -g -Iobj -Isrc
+NASM   = nasm
 PARSER = bison_proj
-LEXER = lex_proj
+LEXER  = lex_proj
+ASM    = src/_anonymous.asm
+TPC   ?= gen-code-types.tpc
 
-ASM = src/_anonymous.asm
-EXEC = out
+.PHONY: all asm run clean
 
-# Cible principale
+all: bin/tpcas
+
 bin/tpcas: obj/$(LEXER).o obj/$(PARSER).o obj/tree.o obj/compiler.o obj/semantique.o
 	$(CC) -o $@ $^ -lfl
 
-# --- GESTION DES DEPENDANCES ---
-
-obj/tree.o: src/tree.c src/tree.h
-obj/compiler.o: src/compiler.c src/compiler.h src/tree.h
+obj/tree.o:       src/tree.c       src/tree.h
+obj/compiler.o:   src/compiler.c   src/compiler.h src/tree.h
 obj/semantique.o: src/semantique.c src/semantique.h src/tree.h
-
-obj/$(PARSER).o: obj/$(PARSER).c src/tree.h
-obj/$(LEXER).o: obj/$(LEXER).c obj/$(PARSER).h
-
-# --- REGLES DE COMPILATION ---
+obj/$(PARSER).o:  obj/$(PARSER).c  src/tree.h
+obj/$(LEXER).o:   obj/$(LEXER).c   obj/$(PARSER).h
 
 obj/%.o: src/%.c
 	$(CC) -c -o $@ $< $(CFLAGS)
@@ -27,37 +25,21 @@ obj/%.o: src/%.c
 obj/%.o: obj/%.c
 	$(CC) -c -o $@ $< $(CFLAGS)
 
-# --- GENERATION FLEX / BISON ---
-
 obj/$(LEXER).c: src/$(LEXER).lex obj/$(PARSER).h
 	flex -o $@ $<
 
 obj/$(PARSER).c obj/$(PARSER).h: src/$(PARSER).y
 	bison -d -o obj/$(PARSER).c $<
 
-# --- GENERATION ASM ---
+# TPC -> ASM
+asm: bin/tpcas
+	./bin/tpcas $(TPC)
 
-# Lance ton compilateur pour générer le .asm
-$(ASM): bin/tpcas
-	./bin/tpcas < $(INPUT)
-
-# --- ASSEMBLAGE ---
-
-# Assemble avec nasm 
-$(EXEC): $(ASM)
-	nasm -f elf64 $(ASM) -o out.o
-	$(CC) out.o -o $(EXEC)
-
-# --- EXECUTION ---
-
-run: $(EXEC)
-	./$(EXEC)
-
-# --- PIPELINE COMPLET ---
-
-all: bin/tpcas $(ASM) $(EXEC)
-
-# --- NETTOYAGE ---
+# TPC -> ASM -> objet -> exécutable -> exécution
+run: asm
+	$(NASM) -f elf64 $(ASM) -o out.o
+	ld -no-pie out.o -o out
+	./out; echo "Code de retour : $$?"
 
 clean:
-	rm -f obj/*.o obj/*.c obj/*.h bin/tpcas out.o $(ASM) $(EXEC)
+	rm -f obj/*.o obj/*.c obj/*.h bin/tpcas $(ASM) out.o out

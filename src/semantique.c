@@ -14,6 +14,13 @@ char* getTypeString(Node* typeNode) {
     }
 }
 
+void init_builtins(Table_symb ** tableGlobale) {
+    add(tableGlobale, "int",  "getint");
+    //add(tableGlobale, "void", "putint");
+    //add(tableGlobale, "int",  "getchar");
+    add(tableGlobale, "void", "putchar");
+}
+
 void translate_to_asm(Node * node, FILE * anonym){  
         if(!node) return;
         switch (node->label){
@@ -243,7 +250,7 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** 
                 fprintf(stderr, "Erreur sémantique ligne %d: Fonction '%s' non déclarée.\n", 
                             node->lineno, nom->value);
             }
-            Node * child = nom->firstChild;
+            Node * child = nom->nextSibling;
             while (child != NULL) {
                 analyse_semantique(child, tableCourante, tableGlobale, anonym);
                 child = child->nextSibling;

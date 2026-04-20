@@ -138,6 +138,7 @@ int main(int argc, char **argv) {
 
         if(root) {
             Table_symb * tableGlobale = NULL;
+            init_builtins(&tableGlobale);
             analyse_semantique(root, &tableGlobale, NULL, anonym); // On lance le parcours
             printf("\n--- Table Globale ---\n");
             printT(tableGlobale);
