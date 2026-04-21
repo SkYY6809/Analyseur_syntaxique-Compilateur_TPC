@@ -11,6 +11,7 @@ TPC   ?= gen-code-types.tpc
 all: bin/tpcas
 
 bin/tpcas: obj/$(LEXER).o obj/$(PARSER).o obj/tree.o obj/compiler.o obj/semantique.o
+	mkdir -p bin
 	$(CC) -o $@ $^ -lfl
 
 obj/tree.o:       src/tree.c       src/tree.h
@@ -24,11 +25,13 @@ obj/%.o: src/%.c
 
 obj/%.o: obj/%.c
 	$(CC) -c -o $@ $< $(CFLAGS)
-
 obj/$(LEXER).c: src/$(LEXER).lex obj/$(PARSER).h
+	mkdir -p obj
 	flex -o $@ $<
 
 obj/$(PARSER).c obj/$(PARSER).h: src/$(PARSER).y
+	mkdir -p obj
+	bison -d -o obj/$(PARSER).c $<
 	bison -d -o obj/$(PARSER).c $<
 
 # TPC -> ASM

@@ -3,5 +3,7 @@
         "*.py": "python",
         "compiler.h": "c",
         "tree.h": "c"
-    }
+    },
+    "cmake.configureOnOpen": false,
+    "makefile.configureOnOpen": false
 }
