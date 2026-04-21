@@ -134,16 +134,19 @@ int main(int argc, char **argv) {
             printTree(root);
         }
         FILE * anonym = fopen("src/_anonymous.asm", "w"); //création de l'assembleur
-        
+        Table_symb * tableGlobale = NULL;
 
         if(root) {
-            Table_symb * tableGlobale = NULL;
-            init_builtins(&tableGlobale);
+           init_builtins(&tableGlobale);
             analyse_semantique(root, &tableGlobale, NULL, anonym); // On lance le parcours
             printf("\n--- Table Globale ---\n");
             printT(tableGlobale);
-            freeTable(tableGlobale);
         }
+        
+        generer_footer_asm(anonym);
+        generer_bss(anonym, tableGlobale);
+        freeTable(tableGlobale);
+        
         fclose(anonym); //fermeture de l'assembleur
         return 0;
     }

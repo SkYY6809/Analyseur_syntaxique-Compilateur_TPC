@@ -1,18 +1,10 @@
-/* gen-code-types.tpc */
+int a;
+int b;
 
-/* Test file for TPC */
-int somme,produit,quotient,reste,difference ;
-char letter, digit, punct;
-int uppercase;
-    
-int main(void)  {
-   somme=12;
-   produit=24;
-   quotient=24/12;
-   letter='c';
-   digit='0';
-   uppercase=letter+('A'-'a');
-   reste=getint();
-   putchar('\n');
-   return 0;
+void main(void) {
+    a = 10;
+    b = 5;
+    /* On teste l'expression : a + b * 2 - 4 */
+    /* Résultat attendu : 10 + (5 * 2) - 4 = 16 */
+    putint(a + b * 2 - 4);
 }

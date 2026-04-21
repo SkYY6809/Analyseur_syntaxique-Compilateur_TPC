@@ -3,6 +3,12 @@
 #include <string.h>
 #include "semantique.h"
 
+static int need_putchar = 0;
+static int need_putint  = 0;
+static int need_getchar = 0;
+static int need_getint  = 0;
+static int global_offset = 0; // pour la gestion de la pile
+
 char* getTypeString(Node* typeNode) {
     if(!typeNode) return "unknown";
     switch(typeNode->label) {
@@ -16,14 +22,18 @@ char* getTypeString(Node* typeNode) {
 
 void init_builtins(Table_symb ** tableGlobale) {
     add(tableGlobale, "int",  "getint");
-    //add(tableGlobale, "void", "putint");
-    //add(tableGlobale, "int",  "getchar");
+    add(tableGlobale, "void", "putint");
+    add(tableGlobale, "int",  "getchar");
     add(tableGlobale, "void", "putchar");
 }
 
 void translate_to_asm(Node * node, FILE * anonym){  
         if(!node) return;
         switch (node->label){
+            case L_IDENT :{
+                fprintf(anonym, "\tpush qword [%s]\n", node->value);
+                break;
+            }
             case L_NUM :{
                 fprintf(anonym, "\tpush %s\n", node->value);
                 break;
@@ -91,7 +101,6 @@ static char* getExprType(Node * node, Table_symb * tableCourante, Table_symb * t
             return "char";
  
         case L_IDENT: {
-            /* cherche en local d'abord, puis global */
             for (Table_symb *t = tableCourante; t; t = t->suiv)
                 if (strcmp(t->ident, node->value) == 0) return t->type;
             for (Table_symb *t = tableGlobale; t; t = t->suiv)
@@ -100,7 +109,6 @@ static char* getExprType(Node * node, Table_symb * tableCourante, Table_symb * t
         }
  
         case L_CALL: {
-            /* type de retour = type enregistré dans la table pour le nom de la fonction */
             const char *fname = node->firstChild->value;
             for (Table_symb *t = tableCourante; t; t = t->suiv)
                 if (strcmp(t->ident, fname) == 0) return t->type;
@@ -109,8 +117,6 @@ static char* getExprType(Node * node, Table_symb * tableCourante, Table_symb * t
             return NULL;
         }
  
-        /* Opérations arithmétiques : le type dominant est int,
-           sauf si les deux opérandes sont char → résultat char */
         case L_ADD: case L_SUB: case L_MUL: case L_DIV: case L_MOD:
         case L_NEG: {
             char *left  = getExprType(node->firstChild, tableCourante, tableGlobale);
@@ -120,12 +126,11 @@ static char* getExprType(Node * node, Table_symb * tableCourante, Table_symb * t
             if (left && right) {
                 if (strcmp(left, "int") == 0 || strcmp(right, "int") == 0)
                     return "int";
-                return left; /* les deux sont char */
+                return left; 
             }
             return left ? left : right;
         }
  
-        /* Opérations logiques/comparaisons → résultat entier (0 ou 1) */
         case L_OR: case L_AND: case L_NOT:
         case L_EQ: case L_NEQ:
         case L_LT: case L_GT: case L_LE: case L_GE:
@@ -170,6 +175,14 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** 
                 if (add(tableCourante, typeStr, varNode->value) == 0) {
                     fprintf(stderr, "Erreur sémantique ligne %d: Variable '%s' déjà déclarée.\n", 
                             node->lineno, varNode->value);
+                } else {
+                    if (tableGlobale == NULL || *tableGlobale == NULL) {
+                        int taille = (strcmp(typeStr, "char") == 0) ? 1 : 8;
+                        Table_symb *t = *tableCourante;
+                        while (t->suiv != NULL) t = t->suiv; // aller au dernier
+                        t->offset = global_offset;
+                        global_offset += taille;
+                    }
                 }
                 varNode = varNode->nextSibling;
             }
@@ -201,7 +214,6 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** 
             }
             printf("\n>>> Analyse de la fonction : %s\n", nomFonct->value);
 
-            // parametres
             Node * param = params->firstChild;
             while(param != NULL) {
                 Node * typeParam = param->firstChild;
@@ -211,7 +223,6 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** 
             }
 
             analyse_semantique(corps, &tableLocale, tableCourante, anonym);
-            translate_to_asm(corps, anonym);
 
             if (strcmp(nomFonct->value, "main") == 0){
                 fprintf(anonym, "\tmov rax, 60\n");
@@ -240,20 +251,42 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** 
             if(!isSameType(ident, value, *tableCourante, *tableGlobale))
                 fprintf(stderr, "Erreur sémantique ligne %d: Pas le même type.\n", 
                             node->lineno);
+
+            translate_to_asm(value, anonym);
+            fprintf(anonym, "\tpop rax\n");
+            fprintf(anonym, "\tmov [%s], rax\n", ident->value);
             
             break;
         }
 
         case L_CALL: {
             Node * nom = node->firstChild;
-           if(!isInAnyTable(nom->value, *tableCourante, tableGlobale ? *tableGlobale : NULL)){
+
+            if(!isInAnyTable(nom->value, *tableCourante, tableGlobale ? *tableGlobale : NULL)){
                 fprintf(stderr, "Erreur sémantique ligne %d: Fonction '%s' non déclarée.\n", 
-                            node->lineno, nom->value);
+                        node->lineno, nom->value);
             }
-            Node * child = nom->nextSibling;
-            while (child != NULL) {
-                analyse_semantique(child, tableCourante, tableGlobale, anonym);
-                child = child->nextSibling;
+
+            Node * arg = nom->nextSibling;
+            while (arg != NULL) {
+                analyse_semantique(arg, tableCourante, tableGlobale, anonym);
+                translate_to_asm(arg, anonym); 
+                arg = arg->nextSibling;
+            }
+
+            if (strcmp(nom->value, "getint") == 0) {
+                need_getint = 1;
+                fprintf(anonym, "\tcall my_getint\n");
+                fprintf(anonym, "\tpush rax\n"); 
+            } else if (strcmp(nom->value, "putint") == 0) {
+                need_putint = 1;
+                fprintf(anonym, "\tcall my_putint\n");
+                fprintf(anonym, "\tadd rsp, 8\n"); 
+            } else if (strcmp(nom->value, "putchar") == 0) {
+                need_putchar = 1;
+                fprintf(anonym, "\tcall my_putchar\n");
+            } else {
+                fprintf(anonym, "\tcall %s\n", nom->value);
             }
             break;
         }
@@ -265,6 +298,150 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** 
                 child = child->nextSibling;
             }
             break;
+        }
+    }
+}
+
+void generer_footer_asm(FILE * anonym) {
+
+        if (need_putint) {
+        fprintf(anonym, "\nmy_putint:\n");
+        fprintf(anonym, "\tpush rbp\n");
+        fprintf(anonym, "\tmov rbp, rsp\n");
+        fprintf(anonym, "\tsub rsp, 32\n");
+        fprintf(anonym, "\tpush rbx\n");
+
+        fprintf(anonym, "\tmov rax, [rbp+16]\n");
+
+        fprintf(anonym, "\tcmp rax, 0\n");
+        fprintf(anonym, "\tjne .pi_nonzero\n");
+        fprintf(anonym, "\tmov byte [rbp-32], '0'\n");
+        fprintf(anonym, "\tmov rax, 1\n");
+        fprintf(anonym, "\tmov rdi, 1\n");
+        fprintf(anonym, "\tlea rsi, [rbp-32]\n");
+        fprintf(anonym, "\tmov rdx, 1\n");
+        fprintf(anonym, "\tsyscall\n");
+        fprintf(anonym, "\tjmp .pi_done\n");
+
+        fprintf(anonym, ".pi_nonzero:\n");
+        fprintf(anonym, "\txor r8, r8\n");
+        fprintf(anonym, "\tcmp rax, 0\n");
+        fprintf(anonym, "\tjge .pi_pos\n");
+        fprintf(anonym, "\tmov r8, 1\n");
+        fprintf(anonym, "\tneg rax\n");
+        fprintf(anonym, ".pi_pos:\n");
+        fprintf(anonym, "\tlea r9, [rbp-1]\n");  
+        fprintf(anonym, "\tmov rcx, 0\n");
+        fprintf(anonym, "\tmov rbx, 10\n");
+
+        fprintf(anonym, ".pi_loop:\n");
+        fprintf(anonym, "\tcmp rax, 0\n");
+        fprintf(anonym, "\tje .pi_write\n");
+        fprintf(anonym, "\txor rdx, rdx\n");
+        fprintf(anonym, "\tdiv rbx\n");
+        fprintf(anonym, "\tadd dl, '0'\n");
+        fprintf(anonym, "\tmov [r9], dl\n");
+        fprintf(anonym, "\tdec r9\n");
+        fprintf(anonym, "\tinc rcx\n");
+        fprintf(anonym, "\tjmp .pi_loop\n");
+
+        fprintf(anonym, ".pi_write:\n");
+        fprintf(anonym, "\tcmp r8, 0\n");
+        fprintf(anonym, "\tje .pi_nosign\n");
+        fprintf(anonym, "\tmov byte [r9], '-'\n");
+        fprintf(anonym, "\tdec r9\n");
+        fprintf(anonym, "\tinc rcx\n");
+        fprintf(anonym, ".pi_nosign:\n");
+        fprintf(anonym, "\tinc r9\n");            
+
+        fprintf(anonym, "\tmov rax, 1\n");
+        fprintf(anonym, "\tmov rsi, r9\n");       
+        fprintf(anonym, "\tmov rdi, 1\n");
+        fprintf(anonym, "\tmov rdx, rcx\n");
+        fprintf(anonym, "\tsyscall\n");
+
+        fprintf(anonym, ".pi_done:\n");
+        fprintf(anonym, "\tpop rbx\n");
+        fprintf(anonym, "\tmov rsp, rbp\n");
+        fprintf(anonym, "\tpop rbp\n");
+        fprintf(anonym, "\tret\n");
+    }
+
+    if (need_putchar) {
+        fprintf(anonym, "\nmy_putchar:\n");
+        fprintf(anonym, "\tpush rbp\n");
+        fprintf(anonym, "\tmov rbp, rsp\n");
+        fprintf(anonym, "\tmov rax, [rbp+16] \n"); 
+        
+        fprintf(anonym, "\tmov [rbp-1], al      ; On met le char dans un petit coin de la pile\n");
+        fprintf(anonym, "\tmov rax, 1           ; syscall: write\n");
+        fprintf(anonym, "\tmov rdi, 1           ; file descriptor: stdout\n");
+        fprintf(anonym, "\tlea rsi, [rbp-1]     ; l'adresse de notre char\n");
+        fprintf(anonym, "\tmov rdx, 1   \n");
+        fprintf(anonym, "\tsyscall\n");
+        
+        fprintf(anonym, "\tmov rsp, rbp\n");
+        fprintf(anonym, "\tpop rbp\n");
+        fprintf(anonym, "\tret\n");
+    }
+
+    
+    if (need_getint) {
+        fprintf(anonym, "\nmy_getint:\n");
+        fprintf(anonym, "\tpush rbp\n");
+        fprintf(anonym, "\tmov rbp, rsp\n");
+        fprintf(anonym, "\tsub rsp, 16        \n");
+        fprintf(anonym, "\txor r12, r12       \n");
+
+        fprintf(anonym, "\tmov rax, 0        \n");
+        fprintf(anonym, "\tmov rdi, 0         \n");
+        fprintf(anonym, "\tlea rsi, [rbp-1]    \n");
+        fprintf(anonym, "\tmov rdx, 1\n");
+        fprintf(anonym, "\tsyscall\n");
+
+        fprintf(anonym, "\tmovzx rbx, byte [rbp-1]\n");
+        fprintf(anonym, "\tcmp rbx, '0'\n");
+        fprintf(anonym, "\tjl .error           \n");
+        fprintf(anonym, "\tcmp rbx, '9'\n");
+        fprintf(anonym, "\tjg .error            \n");
+
+        fprintf(anonym, "\n.loop:\n");
+        fprintf(anonym, "\tsub rbx, '0'\n");
+        fprintf(anonym, "\timul r12, 10      \n");
+        fprintf(anonym, "\tadd r12, rbx        \n");
+
+        fprintf(anonym, "\tmov rax, 0\n");
+        fprintf(anonym, "\tmov rdi, 0\n");
+        fprintf(anonym, "\tlea rsi, [rbp-1]\n");
+        fprintf(anonym, "\tmov rdx, 1\n");
+        fprintf(anonym, "\tsyscall\n");
+
+        fprintf(anonym, "\n\tmovzx rbx, byte [rbp-1]\n");
+        fprintf(anonym, "\tcmp rbx, '0'\n");
+        fprintf(anonym, "\tjl .done\n");
+        fprintf(anonym, "\tcmp rbx, '9'\n");
+        fprintf(anonym, "\tjg .done\n");
+        fprintf(anonym, "\tjmp .loop\n");
+
+        fprintf(anonym, "\n.done:\n");
+        fprintf(anonym, "\tmov rax, r12        \n");
+        fprintf(anonym, "\tmov rsp, rbp\n");
+        fprintf(anonym, "\tpop rbp\n");
+        fprintf(anonym, "\tret\n");
+
+        fprintf(anonym, "\n.error:\n");
+        fprintf(anonym, "\tmov rax, 60          \n");
+        fprintf(anonym, "\tmov rdi, 5           \n");
+        fprintf(anonym, "\tsyscall\n");
+    }
+}
+void generer_bss(FILE * anonym, Table_symb * tableGlobale) {
+    fprintf(anonym, "\nsection .bss\n");
+    for (Table_symb * t = tableGlobale; t; t = t->suiv) {
+        if (strcmp(t->type, "int") == 0 && strcmp(t->ident, "getint") != 0 && strcmp(t->ident, "putint") != 0 && strcmp(t->ident, "putchar") != 0) {
+            fprintf(anonym, "%s resq 1\n", t->ident);  
+        } else if (strcmp(t->type, "char") == 0 && strcmp(t->ident, "getint") != 0 && strcmp(t->ident, "putint") != 0 && strcmp(t->ident, "putchar") != 0) {
+            fprintf(anonym, "%s resb 1\n", t->ident); 
         }
     }
 }

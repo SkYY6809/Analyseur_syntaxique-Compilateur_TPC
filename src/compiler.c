@@ -8,6 +8,7 @@ Table_symb * makeCase(char * type, char * ident){
     }
     t->type = strdup(type);
     t->ident = strdup(ident);
+    t->offset = 0 ;
     t->suiv = NULL;
     return t;
 }

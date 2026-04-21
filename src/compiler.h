@@ -9,6 +9,7 @@ typedef struct Case {
     char * type;
     char * ident;
     struct Case * suiv;
+    int offset; // pour la gestion de la pile
 } Table_symb;
 
 Table_symb * makeCase(char * type, char * ident);
