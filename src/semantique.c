@@ -71,6 +71,43 @@ void translate_to_asm(Node * node, FILE * anonym){
                 fprintf(anonym,"\tpush rax\n");
                 break;
             }
+
+            case L_LT:
+            case L_GT:
+            case L_EQ:
+            case L_NEQ:
+            case L_LE:
+            case L_GE: {               
+                Node * left  = node->firstChild;
+                Node * right = left->nextSibling;
+                char * set = NULL;
+
+                switch (node->label)
+                {
+                    case L_LT:  set = "l";  break; // Less Than
+                    case L_GT:  set = "g";  break; // Greater Than
+                    case L_EQ:  set = "e";  break; // Equal
+                    case L_NEQ: set = "ne"; break; // Not Equal
+                    case L_LE:  set = "le"; break; // Less or Equal
+                    case L_GE:  set = "ge"; break; // Greater or Equal
+                    default:    set = "e";  break; // Par sécurité
+                }
+
+                // Genère le code pour évaluer les deux opérandes
+                translate_to_asm(left, anonym);
+                translate_to_asm(right, anonym);
+
+                // Récupère les valeurs, compare et stocke le résultat (0 ou 1)
+                fprintf(anonym, "\tpop rbx\n");
+                fprintf(anonym, "\tpop rax\n");
+                fprintf(anonym, "\tcmp rax, rbx\n");
+                fprintf(anonym, "\tset%s al\n", set);       // Exemple : setl al
+                fprintf(anonym, "\tmovzx rax, al\n");       // Nettoie rax et garde le résultat
+                fprintf(anonym, "\tpush rax\n");
+                break;
+            }
+
+
             default:{
                 Node * child = node->firstChild;
                 while(child){
@@ -290,6 +327,53 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** 
             }
             break;
         }
+
+        case L_IF: {
+            Node * cond = node->firstChild;
+            Node * corps = cond->nextSibling;
+
+            static int label_count = 0;
+            int lbl = label_count++;
+
+            // Évaluer la condition
+            translate_to_asm(cond, anonym);
+            fprintf(anonym, "\tpop rax\n");
+            fprintf(anonym, "\tcmp rax, 0\n");
+            fprintf(anonym, "\tje .fin_if_%d\n", lbl);   // si faux → sauter
+
+            // Corps du if
+            analyse_semantique(corps, tableCourante, tableGlobale, anonym);
+
+            fprintf(anonym, ".fin_if_%d:\n", lbl);
+            break;
+        }
+
+        case L_IF_ELSE: {
+            Node * cond  = node->firstChild;
+            Node * corps_if   = cond->nextSibling;
+            Node * corps_else = corps_if->nextSibling;
+
+            static int label_count = 0;
+            int lbl = label_count++;
+
+            // Évaluer la condition
+            translate_to_asm(cond, anonym);
+            fprintf(anonym, "\tpop rax\n");
+            fprintf(anonym, "\tcmp rax, 0\n");
+            fprintf(anonym, "\tje .sinon_%d\n", lbl);    // si faux → aller au else
+
+            // Corps du if
+            analyse_semantique(corps_if, tableCourante, tableGlobale, anonym);
+            fprintf(anonym, "\tjmp .fin_si_%d\n", lbl);  // sauter le else
+
+            // Corps du else
+            fprintf(anonym, ".sinon_%d:\n", lbl);
+            analyse_semantique(corps_else, tableCourante, tableGlobale, anonym);
+
+            fprintf(anonym, ".fin_si_%d:\n", lbl);
+            break;
+        }
+
 
         default: {
             Node * child = node->firstChild;
