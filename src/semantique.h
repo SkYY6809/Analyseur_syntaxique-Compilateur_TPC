@@ -5,7 +5,7 @@
 #include "compiler.h"
 
 void init_builtins(Table_symb ** tableGlobale);
-void analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** tableGlobale, FILE * anonym);
+int analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** tableGlobale, FILE * anonym);
 void generer_footer_asm(FILE * anonym) ;
 void generer_bss(FILE * anonym, Table_symb * tableGlobale);
 #endif

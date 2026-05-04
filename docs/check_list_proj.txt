@@ -1,0 +1,28 @@
+
+    - ident doit etre declarer avant utilisation
+
+    - 2 fct et 2 variable global/fct ne peuvent pas avoir le mm ident
+    
+    - param et variable local ne peut pas avoir le mm ident
+    
+    - un main qui renvoie un int est obligatoire
+    
+    - ce que la fct retourne doit etre de mm type que la fct
+    
+    - fct qui retourne void ne peut pas etre utiliser en expr
+    
+    - fct recursive possible
+    
+    - getchar() getint() (voir sujet)
+    
+    - int = entier signer sur 4 octets
+    
+    - operation sur char = conversion en int et ne doit pas provoquer d'avertissement
+    
+    - operation bolean : 0 = False et tt le reste True
+    
+    - avertissement si affectation d'un int a un LValue de type char
+    
+    - option de compil : t (affiche arbre), h (help), s (affiche table des symbole)
+    
+    - valeur de retour du prijet = (voir sujet)

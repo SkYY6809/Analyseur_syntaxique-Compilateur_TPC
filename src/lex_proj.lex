@@ -138,9 +138,10 @@ int main(int argc, char **argv) {
 
         if(root) {
            init_builtins(&tableGlobale);
-            analyse_semantique(root, &tableGlobale, NULL, anonym); // On lance le parcours
-            printf("\n--- Table Globale ---\n");
-            printT(tableGlobale);
+            if (analyse_semantique(root, &tableGlobale, NULL, anonym) == 0){; // On lance le parcours
+                printf("\n--- Table Globale ---\n");
+                printT(tableGlobale);
+            }
         }
         
         generer_footer_asm(anonym);

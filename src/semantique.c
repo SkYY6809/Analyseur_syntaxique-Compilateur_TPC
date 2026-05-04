@@ -7,7 +7,7 @@ static int need_putchar = 0;
 static int need_putint  = 0;
 static int need_getchar = 0;
 static int need_getint  = 0;
-static int global_offset = 0; // pour la gestion de la pile
+static int global_offset = 0; 
 
 char* getTypeString(Node* typeNode) {
     if(!typeNode) return "unknown";
@@ -21,9 +21,13 @@ char* getTypeString(Node* typeNode) {
 }
 
 void init_builtins(Table_symb ** tableGlobale) {
+    if(need_getint)
     add(tableGlobale, "int",  "getint");
+    if(need_putint)
     add(tableGlobale, "void", "putint");
+    if(need_getchar)
     add(tableGlobale, "int",  "getchar");
+    if(need_putchar)
     add(tableGlobale, "void", "putchar");
 }
 
@@ -196,22 +200,24 @@ int isSameType(Node * ident, Node * value, Table_symb * tableCourante, Table_sym
             || (strcmp(type_ident, "int") == 0 && strcmp(type_value, "char") == 0));
 }
 
-void analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** tableGlobale, FILE * anonym) {
-    if (node == NULL) return;
+int analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** tableGlobale, FILE * anonym) {
+    if (node == NULL) return 0;
 
     switch(node->label) {
-
+        //declaration de variable
         case L_DECL_VAR: {
-            Node *typeNode = node->firstChild;
+            Node *typeNode = node->firstChild; //type de la variable
             if (!typeNode) break;
 
             char *typeStr = getTypeString(typeNode);
             
             Node *varNode = typeNode->nextSibling;
             while (varNode != NULL) {
+                //si ce ident est déjà dans la table de symbole
                 if (add(tableCourante, typeStr, varNode->value) == 0) {
                     fprintf(stderr, "Erreur sémantique ligne %d: Variable '%s' déjà déclarée.\n", 
                             node->lineno, varNode->value);
+                    return 3;
                 } else {
                     if (tableGlobale == NULL || *tableGlobale == NULL) {
                         int taille = (strcmp(typeStr, "char") == 0) ? 1 : 8;
@@ -226,31 +232,36 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** 
             break; 
         }
 
+        //declaration de fonction
         case L_DECL_FONCT: {
             Table_symb * tableLocale = NULL;
 
             Node * entete = node->firstChild; 
             Node * corps = entete->nextSibling;
 
-            Node * typeRetour = entete->firstChild;
-            Node * nomFonct = typeRetour->nextSibling;
-            Node * params = nomFonct->nextSibling;
+            Node * typeRetour = entete->firstChild; //type de la fonction
+            Node * nomFonct = typeRetour->nextSibling; //ident de la fonction
+            Node * params = nomFonct->nextSibling; //parametres de la fonction
 
+            //si le nom de la fonction est déjà dans la table de sybole globale
             if(isInTable(nomFonct->value, *tableCourante)){
                 fprintf(stderr, "Erreur sémantique ligne %d: Fonction '%s' déjà déclarée.\n", 
                             node->lineno, nomFonct->value);
+                return 3;
             }
             else{
                 add(tableCourante, getTypeString(typeRetour), nomFonct->value);
             }
 
-            if (strcmp(nomFonct->value, "main") == 0){
+            //si la fonction est le main de type int
+            if (strcmp(nomFonct->value, "main") == 0 && strcmp(getTypeString(typeRetour), "int")){
                 fprintf(anonym, "global _start\n");
                 fprintf(anonym, "section .text\n");
                 fprintf(anonym, "_start:\n");
             }
             printf("\n>>> Analyse de la fonction : %s\n", nomFonct->value);
 
+            //ajout des parametres dans la table de symbole locale
             Node * param = params->firstChild;
             while(param != NULL) {
                 Node * typeParam = param->firstChild;
@@ -261,7 +272,7 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** 
 
             analyse_semantique(corps, &tableLocale, tableCourante, anonym);
 
-            if (strcmp(nomFonct->value, "main") == 0){
+            if (strcmp(nomFonct->value, "main") == 0 && strcmp(getTypeString(typeRetour), "int")){
                 fprintf(anonym, "\tmov rax, 60\n");
                 fprintf(anonym, "\tmov rdi, 0\n");
                 fprintf(anonym, "\tsyscall\n");
@@ -274,21 +285,31 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** 
             break;
         }
 
+        //assignement à une variable
         case L_ASSIGN: {
-            Node * ident = node->firstChild;
-            Node * value = ident->nextSibling;
+            Node * ident = node->firstChild; //identificateur de la variable
+            Node * value = ident->nextSibling; //valeur à assigner
+
+            //si la variable n'est pas declarer dans aucune table (global et local)
             if(!isInAnyTable(ident->value, *tableCourante, tableGlobale ? *tableGlobale : NULL)){
                 fprintf(stderr, "Erreur sémantique ligne %d: Variable '%s' non déclarée.\n", 
                             node->lineno, ident->value);
+                return 3;
             }
-            if(value->label == L_CALL && !isInAnyTable(value->firstChild->value, *tableCourante, tableGlobale ? *tableGlobale : NULL))
+
+            //si la valeur à ajouter est une fonction pas declarer
+            if(value->label == L_CALL && !isInAnyTable(value->firstChild->value, *tableCourante, tableGlobale ? *tableGlobale : NULL)){
                 fprintf(stderr, "Erreur sémantique ligne %d: Fonction '%s' non déclarée.\n", 
                             node->lineno, value->firstChild->value);
+                return 3;
+            }
             
-            if(!isSameType(ident, value, *tableCourante, *tableGlobale))
+            //si la variable et la valeur à assigner ne sont pas du même type
+            if(!isSameType(ident, value, *tableCourante, *tableGlobale)){
                 fprintf(stderr, "Erreur sémantique ligne %d: Pas le même type.\n", 
                             node->lineno);
-
+                return 3;
+            }
             translate_to_asm(value, anonym);
             fprintf(anonym, "\tpop rax\n");
             fprintf(anonym, "\tmov [%s], rax\n", ident->value);
@@ -296,12 +317,15 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** 
             break;
         }
 
+        //appel de fonction
         case L_CALL: {
-            Node * nom = node->firstChild;
+            Node * nom = node->firstChild; //ident de la fonction à appeler
 
+            //si la fonction n'a pas été declaré
             if(!isInAnyTable(nom->value, *tableCourante, tableGlobale ? *tableGlobale : NULL)){
                 fprintf(stderr, "Erreur sémantique ligne %d: Fonction '%s' non déclarée.\n", 
                         node->lineno, nom->value);
+                return 3;
             }
 
             Node * arg = nom->nextSibling;
@@ -328,6 +352,7 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** 
             break;
         }
 
+        //if
         case L_IF: {
             Node * cond = node->firstChild;
             Node * corps = cond->nextSibling;
@@ -348,6 +373,7 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** 
             break;
         }
 
+        //if else
         case L_IF_ELSE: {
             Node * cond  = node->firstChild;
             Node * corps_if   = cond->nextSibling;
@@ -384,6 +410,8 @@ void analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** 
             break;
         }
     }
+
+    return 0;
 }
 
 void generer_footer_asm(FILE * anonym) {
@@ -519,6 +547,7 @@ void generer_footer_asm(FILE * anonym) {
         fprintf(anonym, "\tsyscall\n");
     }
 }
+
 void generer_bss(FILE * anonym, Table_symb * tableGlobale) {
     fprintf(anonym, "\nsection .bss\n");
     for (Table_symb * t = tableGlobale; t; t = t->suiv) {
