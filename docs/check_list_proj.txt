@@ -1,9 +1,11 @@
 
-    - ident doit etre declarer avant utilisation
+OK    - ident doit etre declarer avant utilisation 
 
-    - 2 fct et 2 variable global/fct ne peuvent pas avoir le mm ident
+OK    - 2 fct ne peuvent pas avoir le mm ident
+
+    - 2 variable global/fct ne peuvent pas avoir le mm ident
     
-    - param et variable local ne peut pas avoir le mm ident
+OK    - param et variable local ne peut pas avoir le mm ident
     
     - un main qui renvoie un int est obligatoire
     
@@ -25,4 +27,4 @@
     
     - option de compil : t (affiche arbre), h (help), s (affiche table des symbole)
     
-    - valeur de retour du prijet = (voir sujet)
+    - valeur de retour du projet = (voir sujet)

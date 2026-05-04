@@ -1,0 +1,12 @@
+int fct1(int a){
+    int a;
+    a = 2;
+    return a;
+}
+
+
+
+int main(){
+    fct1();
+    return 1;
+}
