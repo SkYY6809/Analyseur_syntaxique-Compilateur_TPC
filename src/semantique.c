@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "semantique.h"
+#include "compiler.h"
 
 static int need_putchar = 0;
 static int need_putint  = 0;
@@ -128,8 +129,8 @@ static int isInAnyTable(char * ident, Table_symb * locale, Table_symb * globale)
 }
 
 void warningType(char * type_ident, char * type_value, int ligne){
-    if(strcmp(type_ident, "int") == 0 && strcmp(type_value, "char") == 0)
-        printf("Warning ligne %d : Vous assegnez un char à un int\n", ligne);
+    if(strcmp(type_ident, "char") == 0 && strcmp(type_value, "int") == 0)
+        printf("Warning ligne %d : Vous assegnez un int à un char\n", ligne);
 }
 
 static char* getExprType(Node * node, Table_symb * tableCourante, Table_symb * tableGlobale) {
@@ -200,7 +201,18 @@ int isSameType(Node * ident, Node * value, Table_symb * tableCourante, Table_sym
             || (strcmp(type_ident, "int") == 0 && strcmp(type_value, "char") == 0));
 }
 
-int analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** tableGlobale, FILE * anonym) {
+int haveCorrectMain(Table_symb ** tableCourant){
+    if(!tableCourant) 
+        return 0;
+    Table_symb * cur = *tableCourant;
+    for(;cur; cur = cur->suiv){
+        if(strcmp(cur->ident, "main") == 0 && strcmp(cur->type, "int") == 0)
+            return 1;
+    }
+    return 0;
+}
+
+int analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** tableGlobale, FILE * anonym, int symbol, char * currentFctType) {
     if (node == NULL) return 0;
 
     switch(node->label) {
@@ -217,7 +229,7 @@ int analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** t
                 if (add(tableCourante, typeStr, varNode->value) == 0) {
                     fprintf(stderr, "Erreur sémantique ligne %d: Variable '%s' déjà déclarée.\n", 
                             node->lineno, varNode->value);
-                    return 3;
+                    return 2;
                 } else {
                     if (tableGlobale == NULL || *tableGlobale == NULL) {
                         int taille = (strcmp(typeStr, "char") == 0) ? 1 : 8;
@@ -247,7 +259,7 @@ int analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** t
             if(isInTable(nomFonct->value, *tableCourante)){
                 fprintf(stderr, "Erreur sémantique ligne %d: Fonction '%s' déjà déclarée.\n", 
                             node->lineno, nomFonct->value);
-                return 3;
+                return 2;
             }
             else{
                 add(tableCourante, getTypeString(typeRetour), nomFonct->value);
@@ -270,7 +282,8 @@ int analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** t
                 param = param->nextSibling;
             }
 
-            analyse_semantique(corps, &tableLocale, tableCourante, anonym);
+            char * typeRetourStr = getTypeString(typeRetour);
+            analyse_semantique(corps, &tableLocale, tableCourante, anonym, symbol, typeRetourStr);
 
             if (strcmp(nomFonct->value, "main") == 0 && strcmp(getTypeString(typeRetour), "int")){
                 fprintf(anonym, "\tmov rax, 60\n");
@@ -278,8 +291,10 @@ int analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** t
                 fprintf(anonym, "\tsyscall\n");
             }
 
-            printf("--- Table des symboles (Locals + Params) pour '%s' ---\n", nomFonct->value);
-            printT(tableLocale);
+            if(symbol){
+                printf("--- Table des symboles (Locals + Params) pour '%s' ---\n", nomFonct->value);
+                printT(tableLocale);
+            }
             
             freeTable(tableLocale); 
             break;
@@ -294,21 +309,21 @@ int analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** t
             if(!isInAnyTable(ident->value, *tableCourante, tableGlobale ? *tableGlobale : NULL)){
                 fprintf(stderr, "Erreur sémantique ligne %d: Variable '%s' non déclarée.\n", 
                             node->lineno, ident->value);
-                return 3;
+                return 2;
             }
 
             //si la valeur à ajouter est une fonction pas declarer
             if(value->label == L_CALL && !isInAnyTable(value->firstChild->value, *tableCourante, tableGlobale ? *tableGlobale : NULL)){
                 fprintf(stderr, "Erreur sémantique ligne %d: Fonction '%s' non déclarée.\n", 
                             node->lineno, value->firstChild->value);
-                return 3;
+                return 2;
             }
             
             //si la variable et la valeur à assigner ne sont pas du même type
             if(!isSameType(ident, value, *tableCourante, *tableGlobale)){
                 fprintf(stderr, "Erreur sémantique ligne %d: Pas le même type.\n", 
                             node->lineno);
-                return 3;
+                return 2;
             }
             translate_to_asm(value, anonym);
             fprintf(anonym, "\tpop rax\n");
@@ -325,12 +340,12 @@ int analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** t
             if(!isInAnyTable(nom->value, *tableCourante, tableGlobale ? *tableGlobale : NULL)){
                 fprintf(stderr, "Erreur sémantique ligne %d: Fonction '%s' non déclarée.\n", 
                         node->lineno, nom->value);
-                return 3;
+                return 2;
             }
 
             Node * arg = nom->nextSibling;
             while (arg != NULL) {
-                analyse_semantique(arg, tableCourante, tableGlobale, anonym);
+                analyse_semantique(arg, tableCourante, tableGlobale, anonym, symbol, currentFctType);
                 translate_to_asm(arg, anonym); 
                 arg = arg->nextSibling;
             }
@@ -367,7 +382,7 @@ int analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** t
             fprintf(anonym, "\tje .fin_if_%d\n", lbl);   // si faux → sauter
 
             // Corps du if
-            analyse_semantique(corps, tableCourante, tableGlobale, anonym);
+            analyse_semantique(corps, tableCourante, tableGlobale, anonym, symbol, currentFctType);
 
             fprintf(anonym, ".fin_if_%d:\n", lbl);
             break;
@@ -389,22 +404,57 @@ int analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** t
             fprintf(anonym, "\tje .sinon_%d\n", lbl);    // si faux → aller au else
 
             // Corps du if
-            analyse_semantique(corps_if, tableCourante, tableGlobale, anonym);
+            analyse_semantique(corps_if, tableCourante, tableGlobale, anonym, symbol, currentFctType);
             fprintf(anonym, "\tjmp .fin_si_%d\n", lbl);  // sauter le else
 
             // Corps du else
             fprintf(anonym, ".sinon_%d:\n", lbl);
-            analyse_semantique(corps_else, tableCourante, tableGlobale, anonym);
+            analyse_semantique(corps_else, tableCourante, tableGlobale, anonym, symbol, currentFctType);
 
             fprintf(anonym, ".fin_si_%d:\n", lbl);
             break;
         }
 
+        case L_RETURN: {
+            Node * elem = node->firstChild;
+
+            // return sans valeur
+            if (elem == NULL) {
+                if (currentFctType && strcmp(currentFctType, "void") != 0) {
+                    fprintf(stderr, "Erreur sémantique ligne %d: return sans valeur dans une fonction de type '%s'.\n",
+                            node->lineno, currentFctType);
+                    return 2;
+                }
+                break;
+            }
+
+            // return avec valeur dans une fonction void
+            if (currentFctType && strcmp(currentFctType, "void") == 0) {
+                fprintf(stderr, "Erreur sémantique ligne %d: return avec valeur dans une fonction void.\n",
+                        node->lineno);
+                return 2;
+            }
+
+            // vérifier que le type de l'expression correspond
+            char * typeExpr = getExprType(elem, *tableCourante, tableGlobale ? *tableGlobale : NULL);
+            if (typeExpr && currentFctType) {
+                // warning si int assigné à char (comme pour une affectation)
+                warningType(currentFctType, typeExpr, node->lineno);
+                // erreur si types incompatibles
+                if (strcmp(typeExpr, currentFctType) != 0
+                    && !(strcmp(currentFctType, "int") == 0 && strcmp(typeExpr, "char") == 0)) {
+                    fprintf(stderr, "Erreur sémantique ligne %d: type de retour incompatible (attendu '%s', obtenu '%s').\n",
+                            node->lineno, currentFctType, typeExpr);
+                    return 2;
+                }
+            }
+            break;
+        }
 
         default: {
             Node * child = node->firstChild;
             while (child != NULL) {
-                analyse_semantique(child, tableCourante, tableGlobale, anonym);
+                analyse_semantique(child, tableCourante, tableGlobale, anonym, symbol, currentFctType);
                 child = child->nextSibling;
             }
             break;
@@ -552,7 +602,7 @@ void generer_bss(FILE * anonym, Table_symb * tableGlobale) {
     fprintf(anonym, "\nsection .bss\n");
     for (Table_symb * t = tableGlobale; t; t = t->suiv) {
         if (strcmp(t->type, "int") == 0 && strcmp(t->ident, "getint") != 0 && strcmp(t->ident, "putint") != 0 && strcmp(t->ident, "putchar") != 0) {
-            fprintf(anonym, "%s resq 1\n", t->ident);  
+            fprintf(anonym, "%s resd 1\n", t->ident);  
         } else if (strcmp(t->type, "char") == 0 && strcmp(t->ident, "getint") != 0 && strcmp(t->ident, "putint") != 0 && strcmp(t->ident, "putchar") != 0) {
             fprintf(anonym, "%s resb 1\n", t->ident); 
         }

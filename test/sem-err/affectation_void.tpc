@@ -1,0 +1,11 @@
+void fct(){
+    return;
+}
+
+int main(){
+    int a;
+    if(fct()){
+        a = 2;
+    }
+    return a;
+}

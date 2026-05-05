@@ -23,7 +23,7 @@ OK    - param et variable local ne peut pas avoir le mm ident
     
     - operation bolean : 0 = False et tt le reste True
     
-    - avertissement si affectation d'un int a un LValue de type char
+OK    - avertissement si affectation d'un int a un LValue de type char
     
     - option de compil : t (affiche arbre), h (help), s (affiche table des symbole)
     

@@ -98,6 +98,7 @@ void print_help(void) {
 
 int main(int argc, char **argv) {
     int tree = 0;
+    int symbol = 0;
     FILE * input = NULL;
 
     if(argc > 1){
@@ -108,6 +109,9 @@ int main(int argc, char **argv) {
             }
             else if(!strcmp(argv[i], "-t") || !strcmp(argv[i], "--tree")){
                 tree = 1;
+            }
+            else if(!strcmp(argv[i], "-s") || !strcmp(argv[i], "--symtabs")){
+                symbol = 1;
             }
             else if(argv[i][0] == '-'){
                 fprintf(stderr, "Option inconnue : %s\n", argv[i]);
@@ -138,9 +142,19 @@ int main(int argc, char **argv) {
 
         if(root) {
            init_builtins(&tableGlobale);
-            if (analyse_semantique(root, &tableGlobale, NULL, anonym) == 0){; // On lance le parcours
-                printf("\n--- Table Globale ---\n");
-                printT(tableGlobale);
+            if (analyse_semantique(root, &tableGlobale, NULL, anonym, symbol, NULL) == 0){; // On lance le parcours
+                //verif si y'a un main
+                if(!haveCorrectMain(&tableGlobale)){
+                    fprintf(stderr, "Erreur sémantique : Pas de fonction int main().\n");
+                    return 2;
+
+                }
+                //option table de symbol
+                if(symbol){
+                    printf("\n--- Table Globale ---\n");
+                    printT(tableGlobale);
+                
+                }
             }
         }
         

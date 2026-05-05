@@ -1,4 +1,4 @@
-int ftc1;
+int fct1;
 
 int fct1(){
     int a;
