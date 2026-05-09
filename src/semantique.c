@@ -22,14 +22,10 @@ char* getTypeString(Node* typeNode) {
 }
 
 void init_builtins(Table_symb ** tableGlobale) {
-    if(need_getint)
-    add(tableGlobale, "int",  "getint");
-    if(need_putint)
-    add(tableGlobale, "void", "putint");
-    if(need_getchar)
-    add(tableGlobale, "int",  "getchar");
-    if(need_putchar)
-    add(tableGlobale, "void", "putchar");
+        add(tableGlobale, "int",  "getint", 'f');
+        add(tableGlobale, "void", "putint", 'f');
+        add(tableGlobale, "int",  "getchar", 'f');
+        add(tableGlobale, "void", "putchar", 'f');
 }
 
 void translate_to_asm(Node * node, FILE * anonym){  
@@ -206,7 +202,7 @@ int haveCorrectMain(Table_symb ** tableCourant){
         return 0;
     Table_symb * cur = *tableCourant;
     for(;cur; cur = cur->suiv){
-        if(strcmp(cur->ident, "main") == 0 && strcmp(cur->type, "int") == 0)
+        if(strcmp(cur->ident, "main") == 0 && strcmp(cur->type, "int") == 0 && cur->kind == 'f')
             return 1;
     }
     return 0;
@@ -218,85 +214,103 @@ int analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** t
     switch(node->label) {
         //declaration de variable
         case L_DECL_VAR: {
-            Node *typeNode = node->firstChild; //type de la variable
-            if (!typeNode) break;
+    Node *typeNode = node->firstChild; // type de la variable
+    if (!typeNode) break;
 
-            char *typeStr = getTypeString(typeNode);
-            
-            Node *varNode = typeNode->nextSibling;
-            while (varNode != NULL) {
-                //si ce ident est déjà dans la table de symbole
-                if (add(tableCourante, typeStr, varNode->value) == 0) {
-                    fprintf(stderr, "Erreur sémantique ligne %d: Variable '%s' déjà déclarée.\n", 
-                            node->lineno, varNode->value);
-                    return 2;
-                } else {
-                    if (tableGlobale == NULL || *tableGlobale == NULL) {
-                        int taille = (strcmp(typeStr, "char") == 0) ? 1 : 8;
-                        Table_symb *t = *tableCourante;
-                        while (t->suiv != NULL) t = t->suiv; // aller au dernier
-                        t->offset = global_offset;
-                        global_offset += taille;
-                    }
-                }
-                varNode = varNode->nextSibling;
+    char *typeStr = getTypeString(typeNode);
+
+    Node *varNode = typeNode->nextSibling;
+    while (varNode != NULL) {
+        // On verifie s'il y a pas un conflit avec une fonction du même nom 
+        if (tableGlobale == NULL || *tableGlobale == NULL) {
+            if (isInTableWithKind(varNode->value, *tableCourante, 'f')) {
+                fprintf(stderr, "Erreur sémantique ligne %d: '%s' est déjà le nom d'une fonction.\n",
+                        node->lineno, varNode->value);
+                return 2;
             }
-            break; 
         }
+
+        // On tente l'ajout 
+        if (add(tableCourante, typeStr, varNode->value, 'v') == 0) {
+            fprintf(stderr, "Erreur sémantique ligne %d: Variable '%s' déjà déclarée.\n",
+                    node->lineno, varNode->value);
+            return 2;
+        } else {
+            // Calcul de l'offset (uniquement pour les variables globales)
+            if (tableGlobale == NULL || *tableGlobale == NULL) {
+                int taille = (strcmp(typeStr, "char") == 0) ? 1 : 8;
+                Table_symb *t = *tableCourante;
+                while (t->suiv != NULL) t = t->suiv; // aller au dernier élément
+                t->offset = global_offset;
+                global_offset += taille;
+            }
+        }
+        varNode = varNode->nextSibling;
+    }
+    break;
+}
 
         //declaration de fonction
         case L_DECL_FONCT: {
-            Table_symb * tableLocale = NULL;
+            Table_symb *tableLocale = NULL;
 
-            Node * entete = node->firstChild; 
-            Node * corps = entete->nextSibling;
+            Node *entete = node->firstChild;
+            Node *corps  = entete->nextSibling;
 
-            Node * typeRetour = entete->firstChild; //type de la fonction
-            Node * nomFonct = typeRetour->nextSibling; //ident de la fonction
-            Node * params = nomFonct->nextSibling; //parametres de la fonction
+            Node *typeRetour = entete->firstChild;        // type de retour
+            Node *nomFonct   = typeRetour->nextSibling;   // nom de la fonction
+            Node *params     = nomFonct->nextSibling;     // paramètres
 
-            //si le nom de la fonction est déjà dans la table de sybole globale
-            if(isInTable(nomFonct->value, *tableCourante)){
-                fprintf(stderr, "Erreur sémantique ligne %d: Fonction '%s' déjà déclarée.\n", 
-                            node->lineno, nomFonct->value);
+            // Vérifier conflit avec une variable globale du même nom
+            if (isInTableWithKind(nomFonct->value, *tableCourante, 'v')) {
+                fprintf(stderr, "Erreur sémantique ligne %d: '%s' est déjà le nom d'une variable globale.\n",
+                        node->lineno, nomFonct->value);
                 return 2;
             }
-            else{
-                add(tableCourante, getTypeString(typeRetour), nomFonct->value);
+
+            // Vérifier qu'une autre fonction n'a pas déjà ce nom
+            if (isInTableWithKind(nomFonct->value, *tableCourante, 'f')) {
+                fprintf(stderr, "Erreur sémantique ligne %d: Fonction '%s' déjà déclarée.\n",
+                        node->lineno, nomFonct->value);
+                return 2;
             }
 
-            //si la fonction est le main de type int
-            if (strcmp(nomFonct->value, "main") == 0 && strcmp(getTypeString(typeRetour), "int")){
+            // Ajouter la fonction dans la table globale avec kind 'f'
+            add(tableCourante, getTypeString(typeRetour), nomFonct->value, 'f');
+
+            // Génération du header ASM pour main
+            if (strcmp(nomFonct->value, "main") == 0 && strcmp(getTypeString(typeRetour), "int") == 0) {
                 fprintf(anonym, "global _start\n");
                 fprintf(anonym, "section .text\n");
                 fprintf(anonym, "_start:\n");
             }
             printf("\n>>> Analyse de la fonction : %s\n", nomFonct->value);
 
-            //ajout des parametres dans la table de symbole locale
-            Node * param = params->firstChild;
-            while(param != NULL) {
-                Node * typeParam = param->firstChild;
-                Node * nomParam = typeParam->nextSibling;
-                add(&tableLocale, getTypeString(typeParam), nomParam->value);
+            // Ajout des paramètres dans la table locale avec kind 'v'
+            Node *param = params->firstChild;
+            while (param != NULL) {
+                Node *typeParam = param->firstChild;
+                Node *nomParam  = typeParam->nextSibling;
+                add(&tableLocale, getTypeString(typeParam), nomParam->value, 'v');
                 param = param->nextSibling;
             }
 
-            char * typeRetourStr = getTypeString(typeRetour);
+            char *typeRetourStr = getTypeString(typeRetour);
             analyse_semantique(corps, &tableLocale, tableCourante, anonym, symbol, typeRetourStr);
 
-            if (strcmp(nomFonct->value, "main") == 0 && strcmp(getTypeString(typeRetour), "int")){
+            // Génération du footer ASM pour main
+            if (strcmp(nomFonct->value, "main") == 0 && strcmp(getTypeString(typeRetour), "int") == 0) {
                 fprintf(anonym, "\tmov rax, 60\n");
                 fprintf(anonym, "\tmov rdi, 0\n");
                 fprintf(anonym, "\tsyscall\n");
             }
 
-            if(symbol){
+            if (symbol) {
                 printf("--- Table des symboles (Locals + Params) pour '%s' ---\n", nomFonct->value);
                 printT(tableLocale);
             }
-            
-            freeTable(tableLocale); 
+
+            freeTable(tableLocale);
             break;
         }
 
@@ -320,7 +334,7 @@ int analyse_semantique(Node * node, Table_symb ** tableCourante, Table_symb ** t
             }
             
             //si la variable et la valeur à assigner ne sont pas du même type
-            if(!isSameType(ident, value, *tableCourante, *tableGlobale)){
+            if(!isSameType(ident, value, *tableCourante, tableGlobale ? *tableGlobale : NULL)){
                 fprintf(stderr, "Erreur sémantique ligne %d: Pas le même type.\n", 
                             node->lineno);
                 return 2;
@@ -598,13 +612,13 @@ void generer_footer_asm(FILE * anonym) {
     }
 }
 
-void generer_bss(FILE * anonym, Table_symb * tableGlobale) {
+void generer_bss(FILE *anonym, Table_symb *tableGlobale) {
     fprintf(anonym, "\nsection .bss\n");
-    for (Table_symb * t = tableGlobale; t; t = t->suiv) {
-        if (strcmp(t->type, "int") == 0 && strcmp(t->ident, "getint") != 0 && strcmp(t->ident, "putint") != 0 && strcmp(t->ident, "putchar") != 0) {
-            fprintf(anonym, "%s resd 1\n", t->ident);  
-        } else if (strcmp(t->type, "char") == 0 && strcmp(t->ident, "getint") != 0 && strcmp(t->ident, "putint") != 0 && strcmp(t->ident, "putchar") != 0) {
-            fprintf(anonym, "%s resb 1\n", t->ident); 
-        }
+    for (Table_symb *t = tableGlobale; t; t = t->suiv) {
+        if (t->kind != 'v') continue; 
+        if (strcmp(t->type, "int") == 0)
+            fprintf(anonym, "%s resd 1\n", t->ident);
+        else if (strcmp(t->type, "char") == 0)
+            fprintf(anonym, "%s resb 1\n", t->ident);
     }
 }

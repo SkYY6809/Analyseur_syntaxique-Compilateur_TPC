@@ -141,20 +141,24 @@ int main(int argc, char **argv) {
         Table_symb * tableGlobale = NULL;
 
         if(root) {
-           init_builtins(&tableGlobale);
-            if (analyse_semantique(root, &tableGlobale, NULL, anonym, symbol, NULL) == 0){; // On lance le parcours
-                //verif si y'a un main
-                if(!haveCorrectMain(&tableGlobale)){
-                    fprintf(stderr, "Erreur sémantique : Pas de fonction int main().\n");
-                    return 2;
+            init_builtins(&tableGlobale);
+            int ret = analyse_semantique(root, &tableGlobale, NULL, anonym, symbol, NULL); // On lance le parcours
+            if (ret != 0) {
+                fclose(anonym);
+                freeTable(tableGlobale);
+                return ret; // retourne 2
+            }
+            //verif si y'a un main
+            if(!haveCorrectMain(&tableGlobale)){
+                fprintf(stderr, "Erreur sémantique : Pas de fonction int main().\n");
+                return 2;
 
-                }
-                //option table de symbol
-                if(symbol){
-                    printf("\n--- Table Globale ---\n");
-                    printT(tableGlobale);
-                
-                }
+            }
+            //option table de symbol
+            if(symbol){
+                printf("\n--- Table Globale ---\n");
+                printT(tableGlobale);
+            
             }
         }
         
