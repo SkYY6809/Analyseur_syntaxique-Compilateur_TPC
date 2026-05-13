@@ -1,0 +1,6 @@
+int main() {
+    putchar('H');
+    putchar('i');
+    putchar(10);
+    return 0;
+}

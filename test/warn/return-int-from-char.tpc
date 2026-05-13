@@ -1,0 +1,8 @@
+char foo() {
+    return 300;  
+}
+
+int main() {
+    putchar(foo());
+    return 0;
+}

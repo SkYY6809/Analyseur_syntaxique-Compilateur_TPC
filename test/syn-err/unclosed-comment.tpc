@@ -1,0 +1,4 @@
+int main() {
+    /* ce commentaire n'est pas fermé
+    return 0;
+}

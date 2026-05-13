@@ -1,0 +1,7 @@
+char foo() {
+    return 1000;  
+}
+
+void bar() {
+    return 5;  
+}

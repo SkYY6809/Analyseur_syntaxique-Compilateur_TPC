@@ -1,0 +1,9 @@
+struct Point {
+    int x;
+};
+
+int main() {
+    struct Point p;
+    p.z = 3; 
+    return 0;
+}

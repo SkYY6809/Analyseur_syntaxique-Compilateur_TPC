@@ -1,0 +1,6 @@
+int main() {
+    char c;
+    c = 97;  
+    putchar(c);
+    return 0;
+}
