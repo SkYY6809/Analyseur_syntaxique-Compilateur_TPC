@@ -100,6 +100,7 @@ int main(int argc, char **argv) {
     int tree = 0;
     int symbol = 0;
     FILE * input = NULL;
+    char *input_filename = NULL;  
 
     if(argc > 1){
         for(int i = 1; i < argc; i++){
@@ -127,6 +128,7 @@ int main(int argc, char **argv) {
                     perror("fopen");
                     return 2;
                 }
+                input_filename = argv[i];
                 yyin = input;
             }
         }
@@ -137,7 +139,25 @@ int main(int argc, char **argv) {
             printf("Affichage de l'arbre abstrait \n");
             printTree(root);
         }
-        FILE * anonym = fopen("src/_anonymous.asm", "w"); //création de l'assembleur
+        char asm_name[512];
+        if (input_filename == NULL) {
+            snprintf(asm_name, sizeof(asm_name), "_anonymous.asm");
+        } else {
+            strncpy(asm_name, input_filename, sizeof(asm_name) - 1);
+            asm_name[sizeof(asm_name) - 1] = '\0';
+            char *dot = strrchr(asm_name, '.');
+            if (dot && strcmp(dot, ".tpc") == 0) {
+                strcpy(dot, ".asm");   
+            } else {
+                strncat(asm_name, ".asm", sizeof(asm_name) - strlen(asm_name) - 1);
+            }
+        }
+
+        FILE * anonym = fopen(asm_name, "w");  // ← remplace l'ancien fopen hardcodé
+        if (!anonym) {
+            perror("Impossible de créer le fichier ASM");
+            return 3;
+        }        
         Table_symb * tableGlobale = NULL;
 
         if(root) {
