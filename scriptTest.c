@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,7 +27,7 @@ void test_dossier(char *path, int code_attendu) {
         if (dir->d_type == DT_REG && strstr(dir->d_name, ".tpc")) {
             total_tests++;
             
-            sprintf(commande, "./bin/tpcas < %s/%s > /dev/null 2>&1", path, dir->d_name);
+            sprintf(commande, "./bin/tpcc < %s/%s > /dev/null 2>&1", path, dir->d_name);
             
             int ret = system(commande);
             int code_retour = -1;
@@ -48,8 +49,8 @@ void test_dossier(char *path, int code_attendu) {
 
 int main(int argc, char **argv) {
     // Vérification de si l'exécutable est là
-    if (access("./bin/tpcas", F_OK) == -1) {
-        printf("Erreur: ./bin/tpcas introuvable. Fais un make !\n");
+    if (access("./bin/tpcc", F_OK) == -1) {
+        printf("Erreur: ./bin/tpcc introuvable. Fais un make !\n");
         return 1;
     }
 

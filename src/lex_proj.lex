@@ -93,7 +93,7 @@ extern Node * root;
 %%
 
 void print_help(void) {
-    printf("Usage: ./tpcas [OPTIONS] [FILE]\nAnalyse syntaxique du langage tpc\n\nOptions:\n\t-h, --help     Affiche cette aide et quitte\n\t-t, --tree     Affiche l'arbre syntaxique abstrait\n\nSans FILE, le programme lit l'entrée standard.\n");
+    printf("Usage: ./tpcc [OPTIONS] [FILE]\nAnalyse syntaxique du langage tpc\n\nOptions:\n\t-h, --help     Affiche cette aide et quitte\n\t-t, --tree     Affiche l'arbre syntaxique abstrait\n\nSans FILE, le programme lit l'entrée standard.\n");
 }
 
 int main(int argc, char **argv) {
@@ -116,7 +116,7 @@ int main(int argc, char **argv) {
             }
             else if(argv[i][0] == '-'){
                 fprintf(stderr, "Option inconnue : %s\n", argv[i]);
-                return 2;
+                return 3;
             }
             else{
                 if(input != NULL){
@@ -153,7 +153,7 @@ int main(int argc, char **argv) {
             }
         }
 
-        FILE * anonym = fopen(asm_name, "w");  // ← remplace l'ancien fopen hardcodé
+        FILE * anonym = fopen(asm_name, "w"); 
         if (!anonym) {
             perror("Impossible de créer le fichier ASM");
             return 3;
