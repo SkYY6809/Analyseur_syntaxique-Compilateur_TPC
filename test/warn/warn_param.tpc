@@ -1,0 +1,11 @@
+
+void test(int a){
+    return ;
+}
+
+int main(){
+    char a;
+    a = 'a';
+    test(a);
+    return a;
+}

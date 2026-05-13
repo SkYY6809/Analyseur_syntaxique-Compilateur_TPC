@@ -1,6 +1,0 @@
-int main() {
-    int a;
-    a = 10;
-    z = 5;  /* ERREUR : z n'est pas déclaré ! */
-    return a;
-}
