@@ -3,6 +3,7 @@
 #include "bison_proj.h"
 #include "compiler.h"
 #include "semantique.h"
+#include "struct_table.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -102,6 +103,7 @@ int main(int argc, char **argv) {
     FILE * input = NULL;
     char *input_filename = NULL;  
 
+    //lecture des parametres
     if(argc > 1){
         for(int i = 1; i < argc; i++){
             if(!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")){
@@ -162,6 +164,7 @@ int main(int argc, char **argv) {
 
         if(root) {
             init_builtins(&tableGlobale);
+            init_struct_table();
             int ret = analyse_semantique(root, &tableGlobale, NULL, anonym, symbol, NULL); // On lance le parcours
             if (ret != 0) {
                 fclose(anonym);
@@ -185,6 +188,7 @@ int main(int argc, char **argv) {
         generer_footer_asm(anonym);
         generer_bss(anonym, tableGlobale);
         freeTable(tableGlobale);
+        free_struct_table();
         
         fclose(anonym); //fermeture de l'assembleur
         return 0;

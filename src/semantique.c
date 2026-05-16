@@ -3,15 +3,42 @@
 #include <string.h>
 #include "semantique.h"
 #include "compiler.h"
+#include "struct_table.h"
 
 static int need_putchar = 0;
 static int need_putint  = 0;
 static int need_getchar = 0;
 static int need_getint  = 0;
 static int global_offset = 0;
-
-/* Compteur global de labels pour éviter les collisions entre if/while/booléens */
 static int label_count = 0;
+//static StructDef * struct_definitions = NULL; 
+
+
+TypeInfo* make_type_info(const char *base_type, const char *struct_name) {
+    TypeInfo *ti = malloc(sizeof(TypeInfo));
+    ti->base_type = strdup(base_type);
+    ti->struct_name = struct_name ? strdup(struct_name) : NULL;
+    return ti;
+}
+
+void free_type_info(TypeInfo *ti) {
+    if (ti) {
+        free(ti->base_type);
+        if (ti->struct_name) free(ti->struct_name);
+        free(ti);
+    }
+}
+
+char* type_info_to_string(TypeInfo *ti) {
+    static char buffer[256];
+    if (!ti) return "unknown";
+    if (strcmp(ti->base_type, "struct") == 0 && ti->struct_name) {
+        snprintf(buffer, sizeof(buffer), "struct %s", ti->struct_name);
+    } else {
+        snprintf(buffer, sizeof(buffer), "%s", ti->base_type);
+    }
+    return buffer;
+}
 
 char* getTypeString(Node* typeNode) {
     if(!typeNode) return "unknown";
@@ -40,36 +67,39 @@ void translate_to_asm(Node * node, FILE * anonym) {
     switch (node->label) {
 
         case L_IDENT: {
-            fprintf(anonym, "\tpush dword [%s]\n", node->value);
+            /* Ici il faudra checker dans les tables, pour l'instant simplifié */
+            fprintf(anonym, "\tmov eax, dword [%s]\n", node->value);
+            fprintf(anonym, "\tpush rax\n");
             break;
         }
 
         case L_NUM: {
-            fprintf(anonym, "\tpush %s\n", node->value);
+            fprintf(anonym, "\tmov rax, %s\n", node->value);
+            fprintf(anonym, "\tpush rax\n");
             break;
         }
 
         case L_CHAR: {
-            /* node->value est de la forme 'x' ou '\n' etc. — on push la valeur ASCII */
-            fprintf(anonym, "\tpush %s\n", node->value);
+            fprintf(anonym, "\tmov rax, %s\n", node->value);
+            fprintf(anonym, "\tpush rax\n");
             break;
         }
 
         case L_NEG: {
             translate_to_asm(node->firstChild, anonym);
-            fprintf(anonym, "\tpop eax\n");
-            fprintf(anonym, "\tneg eax\n");
-            fprintf(anonym, "\tpush eax\n");
+            fprintf(anonym, "\tpop rax\n");
+            fprintf(anonym, "\tneg rax\n");
+            fprintf(anonym, "\tpush rax\n");
             break;
         }
 
         case L_NOT: {
             translate_to_asm(node->firstChild, anonym);
-            fprintf(anonym, "\tpop eax\n");
-            fprintf(anonym, "\tcmp eax, 0\n");
+            fprintf(anonym, "\tpop rax\n");
+            fprintf(anonym, "\tcmp rax, 0\n");
             fprintf(anonym, "\tsete al\n");
-            fprintf(anonym, "\tmovzx eax, al\n");
-            fprintf(anonym, "\tpush eax\n");
+            fprintf(anonym, "\tmovzx rax, al\n");
+            fprintf(anonym, "\tpush rax\n");
             break;
         }
 
@@ -78,12 +108,12 @@ void translate_to_asm(Node * node, FILE * anonym) {
             Node *left  = node->firstChild;
             Node *right = left->nextSibling;
             translate_to_asm(left, anonym);
-            fprintf(anonym, "\tpop eax\n");
-            fprintf(anonym, "\tcmp eax, 0\n");
+            fprintf(anonym, "\tpop rax\n");
+            fprintf(anonym, "\tcmp rax, 0\n");
             fprintf(anonym, "\tje .and_false_%d\n", lbl);
             translate_to_asm(right, anonym);
-            fprintf(anonym, "\tpop eax\n");
-            fprintf(anonym, "\tcmp eax, 0\n");
+            fprintf(anonym, "\tpop rax\n");
+            fprintf(anonym, "\tcmp rax, 0\n");
             fprintf(anonym, "\tje .and_false_%d\n", lbl);
             fprintf(anonym, "\tpush 1\n");
             fprintf(anonym, "\tjmp .and_end_%d\n", lbl);
@@ -98,12 +128,12 @@ void translate_to_asm(Node * node, FILE * anonym) {
             Node *left  = node->firstChild;
             Node *right = left->nextSibling;
             translate_to_asm(left, anonym);
-            fprintf(anonym, "\tpop eax\n");
-            fprintf(anonym, "\tcmp eax, 0\n");
+            fprintf(anonym, "\tpop rax\n");
+            fprintf(anonym, "\tcmp rax, 0\n");
             fprintf(anonym, "\tjne .or_true_%d\n", lbl);
             translate_to_asm(right, anonym);
-            fprintf(anonym, "\tpop eax\n");
-            fprintf(anonym, "\tcmp eax, 0\n");
+            fprintf(anonym, "\tpop rax\n");
+            fprintf(anonym, "\tcmp rax, 0\n");
             fprintf(anonym, "\tjne .or_true_%d\n", lbl);
             fprintf(anonym, "\tpush 0\n");
             fprintf(anonym, "\tjmp .or_end_%d\n", lbl);
@@ -118,10 +148,10 @@ void translate_to_asm(Node * node, FILE * anonym) {
             Node *right = left->nextSibling;
             translate_to_asm(left, anonym);
             translate_to_asm(right, anonym);
-            fprintf(anonym, "\tpop ebx\n");
-            fprintf(anonym, "\tpop eax\n");
-            fprintf(anonym, "\tsub eax, ebx\n");
-            fprintf(anonym, "\tpush eax\n");
+            fprintf(anonym, "\tpop rbx\n");
+            fprintf(anonym, "\tpop rax\n");
+            fprintf(anonym, "\tsub rax, rbx\n");
+            fprintf(anonym, "\tpush rax\n");
             break;
         }
 
@@ -130,10 +160,10 @@ void translate_to_asm(Node * node, FILE * anonym) {
             Node *right = left->nextSibling;
             translate_to_asm(left, anonym);
             translate_to_asm(right, anonym);
-            fprintf(anonym, "\tpop ebx\n");
-            fprintf(anonym, "\tpop eax\n");
-            fprintf(anonym, "\tadd eax, ebx\n");
-            fprintf(anonym, "\tpush eax\n");
+            fprintf(anonym, "\tpop rbx\n");
+            fprintf(anonym, "\tpop rax\n");
+            fprintf(anonym, "\tadd rax, rbx\n");
+            fprintf(anonym, "\tpush rax\n");
             break;
         }
 
@@ -142,10 +172,10 @@ void translate_to_asm(Node * node, FILE * anonym) {
             Node *right = left->nextSibling;
             translate_to_asm(left, anonym);
             translate_to_asm(right, anonym);
-            fprintf(anonym, "\tpop ebx\n");
-            fprintf(anonym, "\tpop eax\n");
-            fprintf(anonym, "\timul eax, ebx\n");
-            fprintf(anonym, "\tpush eax\n");
+            fprintf(anonym, "\tpop rbx\n");
+            fprintf(anonym, "\tpop rax\n");
+            fprintf(anonym, "\timul rax, rbx\n");
+            fprintf(anonym, "\tpush rax\n");
             break;
         }
 
@@ -154,11 +184,11 @@ void translate_to_asm(Node * node, FILE * anonym) {
             Node *right = left->nextSibling;
             translate_to_asm(left, anonym);
             translate_to_asm(right, anonym);
-            fprintf(anonym, "\tpop ebx\n");
-            fprintf(anonym, "\tpop eax\n");
-            fprintf(anonym, "\tcdq\n");         // étend eax dans edx:eax (signé)
-            fprintf(anonym, "\tidiv ebx\n");
-            fprintf(anonym, "\tpush eax\n");    // quotient
+            fprintf(anonym, "\tpop rbx\n");
+            fprintf(anonym, "\tpop rax\n");
+            fprintf(anonym, "\tcqo\n");          /* sign extension rax -> rdx:rax */
+            fprintf(anonym, "\tidiv rbx\n");
+            fprintf(anonym, "\tpush rax\n");     /* quotient */
             break;
         }
 
@@ -167,11 +197,11 @@ void translate_to_asm(Node * node, FILE * anonym) {
             Node *right = left->nextSibling;
             translate_to_asm(left, anonym);
             translate_to_asm(right, anonym);
-            fprintf(anonym, "\tpop ebx\n");
-            fprintf(anonym, "\tpop eax\n");
-            fprintf(anonym, "\tcdq\n");
-            fprintf(anonym, "\tidiv ebx\n");
-            fprintf(anonym, "\tpush edx\n");    // reste
+            fprintf(anonym, "\tpop rbx\n");
+            fprintf(anonym, "\tpop rax\n");
+            fprintf(anonym, "\tcqo\n");
+            fprintf(anonym, "\tidiv rbx\n");
+            fprintf(anonym, "\tpush rdx\n");     /* reste */
             break;
         }
 
@@ -190,22 +220,17 @@ void translate_to_asm(Node * node, FILE * anonym) {
             }
             translate_to_asm(left, anonym);
             translate_to_asm(right, anonym);
-            fprintf(anonym, "\tpop ebx\n");
-            fprintf(anonym, "\tpop eax\n");
-            fprintf(anonym, "\tcmp eax, ebx\n");
+            fprintf(anonym, "\tpop rbx\n");
+            fprintf(anonym, "\tpop rax\n");
+            fprintf(anonym, "\tcmp rax, rbx\n");
             fprintf(anonym, "\tset%s al\n", set);
-            fprintf(anonym, "\tmovzx eax, al\n");
-            fprintf(anonym, "\tpush eax\n");
+            fprintf(anonym, "\tmovzx rax, al\n");
+            fprintf(anonym, "\tpush rax\n");
             break;
         }
-        default: {
-            Node *child = node->firstChild;
-            while (child) {
-                translate_to_asm(child, anonym);
-                child = child->nextSibling;
-            }
+
+        default :
             break;
-        }
     }
 }
 
@@ -229,102 +254,173 @@ void warningType(char *type_dest, char *type_src, int ligne) {
 
 
 /*
- * POINT 1 — Vérifie qu'une expression n'est pas un appel de fonction void.
- * Retourne 2 et imprime une erreur si c'est le cas, 0 sinon.
- */
-static int checkNotVoidExpr(Node *expr, Table_symb *tableCourante, Table_symb *tableGlobale, int ligne);
-
-/*
  * Retourne le type d'une expression, ou NULL si indéterminable.
  * Règle du sujet : toute opération sur char produit un int (conversion implicite)
  */
-static char* getExprType(Node *node, Table_symb *tableCourante, Table_symb *tableGlobale) {
+// Remplacer l'ancienne fonction getExprType par celle-ci
+static TypeInfo* getExprType(Node *node, Table_symb *tableCourante, Table_symb *tableGlobale) {
     if (!node) return NULL;
 
     switch (node->label) {
-        /* Terminaux */
         case L_NUM:
-            return "int";
+            return make_type_info("int", NULL);
             
         case L_CHAR:
-            return "char";
+            return make_type_info("char", NULL);
             
         case L_IDENT: {
-            /* Chercher d'abord dans la table locale, puis globale */
-            for (Table_symb *t = tableCourante; t; t = t->suiv)
-                if (strcmp(t->ident, node->value) == 0) return t->type;
-            for (Table_symb *t = tableGlobale; t; t = t->suiv)
-                if (strcmp(t->ident, node->value) == 0) return t->type;
+            Table_symb *t;
+            for (t = tableCourante; t; t = t->suiv)
+                if (strcmp(t->ident, node->value) == 0)
+                    return make_type_info(t->type, 
+                        (strcmp(t->type, "struct") == 0 && t->struct_name) ? t->struct_name : NULL);
+            for (t = tableGlobale; t; t = t->suiv)
+                if (strcmp(t->ident, node->value) == 0)
+                    return make_type_info(t->type,
+                        (strcmp(t->type, "struct") == 0 && t->struct_name) ? t->struct_name : NULL);
             return NULL;
         }
         
         case L_CALL: {
-            /* Appel de fonction : retourne le type de retour de la fonction */
             if (!node->firstChild) return NULL;
             const char *fname = node->firstChild->value;
-            for (Table_symb *t = tableCourante; t; t = t->suiv)
-                if (strcmp(t->ident, fname) == 0) return t->type;
-            for (Table_symb *t = tableGlobale; t; t = t->suiv)
-                if (strcmp(t->ident, fname) == 0) return t->type;
+            Table_symb *t;
+            for (t = tableCourante; t; t = t->suiv)
+                if (strcmp(t->ident, fname) == 0)
+                    return make_type_info(t->type,
+                        (strcmp(t->type, "struct") == 0 && t->struct_name) ? t->struct_name : NULL);
+            for (t = tableGlobale; t; t = t->suiv)
+                if (strcmp(t->ident, fname) == 0)
+                    return make_type_info(t->type,
+                        (strcmp(t->type, "struct") == 0 && t->struct_name) ? t->struct_name : NULL);
             return NULL;
         }
         
-        /* Opérateurs binaires arithmétiques : + - * / % */
-        case L_ADD:
-        case L_SUB:
-        case L_MUL:
-        case L_DIV:
-        case L_MOD: {
+        case L_FIELD_ACCESS: {
+            // Récupérer le type de la base
+            Node *base = node->firstChild;
+            if (!base) return NULL;
+            
+            TypeInfo *base_type = getExprType(base, tableCourante, tableGlobale);
+            if (!base_type) return NULL;
+            
+            // Vérifier que la base est une structure
+            if (strcmp(base_type->base_type, "struct") != 0) {
+                fprintf(stderr, "Erreur sémantique ligne %d : accès champ sur un type non-structure (%s)\n",
+                        node->lineno, base_type->base_type);
+                free_type_info(base_type);
+                return NULL;
+            }
+            
+            // Chercher la définition de la structure
+            StructDef *s = find_struct(base_type->struct_name);
+            if (!s) {
+                fprintf(stderr, "Erreur sémantique ligne %d : structure '%s' non définie\n",
+                        node->lineno, base_type->struct_name);
+                free_type_info(base_type);
+                return NULL;
+            }
+            
+            // Parcourir les champs (le premier champ est à base->nextSibling)
+            Node *field_node = base->nextSibling;
+            TypeInfo *current_type = base_type;
+            StructDef *current_struct = s;
+            
+            while (field_node && field_node->label == L_IDENT) {
+                Field *f = find_field(current_struct, field_node->value);
+                if (!f) {
+                    fprintf(stderr, "Erreur sémantique ligne %d : champ '%s' inexistant dans structure '%s'\n",
+                            node->lineno, field_node->value, current_struct->name);
+                    free_type_info(current_type);
+                    return NULL;
+                }
+                
+                // Libérer l'ancien type_info sauf pour le premier
+                if (current_type != base_type) free_type_info(current_type);
+                
+                // Créer le nouveau type_info pour le champ
+                current_type = make_type_info(f->type, f->struct_name);
+                
+                // Si le champ est une structure, la suivante pour l'imbrication
+                if (strcmp(f->type, "struct") == 0 && f->struct_name) {
+                    current_struct = find_struct(f->struct_name);
+                    if (!current_struct) {
+                        fprintf(stderr, "Erreur sémantique ligne %d : structure '%s' non définie\n",
+                                node->lineno, f->struct_name);
+                        free_type_info(current_type);
+                        return NULL;
+                    }
+                } else {
+                    current_struct = NULL;
+                }
+                
+                field_node = field_node->nextSibling;
+            }
+            
+            free_type_info(base_type);
+            return current_type;
+        }
+        
+        case L_ADD: case L_SUB: case L_MUL: case L_DIV: case L_MOD: {
             Node *left = node->firstChild;
             Node *right = left ? left->nextSibling : NULL;
             
-            char *leftType = left ? getExprType(left, tableCourante, tableGlobale) : NULL;
-            char *rightType = right ? getExprType(right, tableCourante, tableGlobale) : NULL;
+            TypeInfo *leftType = left ? getExprType(left, tableCourante, tableGlobale) : NULL;
+            TypeInfo *rightType = right ? getExprType(right, tableCourante, tableGlobale) : NULL;
             
-            /* Si l'un des opérandes est invalide */
-            if (!leftType || !rightType) return NULL;
+            if (!leftType || !rightType) {
+                if (leftType) free_type_info(leftType);
+                if (rightType) free_type_info(rightType);
+                return NULL;
+            }
             
-            /* Si l'un des opérandes est int, le résultat est int */
-            if (strcmp(leftType, "int") == 0 || strcmp(rightType, "int") == 0)
-                return "int";
+            int is_left_struct = (strcmp(leftType->base_type, "struct") == 0);
+            int is_right_struct = (strcmp(rightType->base_type, "struct") == 0);
             
-            /* char op char → int (conversion implicite selon le sujet) */
-            if (strcmp(leftType, "char") == 0 && strcmp(rightType, "char") == 0)
-                return "int";
+            if (is_left_struct || is_right_struct) {
+                fprintf(stderr, "Erreur sémantique ligne %d : opération arithmétique sur des structures\n",
+                        node->lineno);
+                free_type_info(leftType);
+                free_type_info(rightType);
+                return NULL;
+            }
             
-            /* Cas par défaut */
-            return "int";
+            free_type_info(leftType);
+            free_type_info(rightType);
+            return make_type_info("int", NULL);
         }
         
-        /* Opérateur unaire NEG (- expr) */
-        case L_NEG: {
-            /* Le résultat de -expr est toujours un int */
-            return "int";
-        }
-
-        /* Opérateurs logiques et de comparaison */
-        case L_NOT:
-        case L_AND:
-        case L_OR:
-        case L_EQ:
-        case L_NEQ:
-        case L_LT:
-        case L_GT:
-        case L_LE:
-        case L_GE: {
-            return "int";
-        }
-
-        default:
+        case L_NOT: case L_AND: case L_OR:
+        case L_EQ: case L_NEQ: case L_LT: case L_GT: case L_LE: case L_GE:
+        case L_NEG:
+            return make_type_info("int", NULL);
+            
+        default: {
+            // Pour les autres nœuds, on propage (mais normalement on ne devrait pas arriver là)
+            Node *child = node->firstChild;
+            while (child) {
+                TypeInfo *ti = getExprType(child, tableCourante, tableGlobale);
+                if (ti && strcmp(ti->base_type, "void") != 0) {
+                    free_type_info(ti);
+                    return make_type_info("int", NULL);
+                }
+                if (ti) free_type_info(ti);
+                child = child->nextSibling;
+            }
             return NULL;
+        }
     }
 }
 
-
 static int checkNotVoidExpr(Node *expr, Table_symb *tableCourante, Table_symb *tableGlobale, int ligne) {
     if (!expr) return 0;
-    char *t = getExprType(expr, tableCourante, tableGlobale);
-    if (t && strcmp(t, "void") == 0) {
+    TypeInfo *t = getExprType(expr, tableCourante, tableGlobale);
+    if (!t) return 0;
+    
+    int is_void = (strcmp(t->base_type, "void") == 0);
+    free_type_info(t);
+    
+    if (is_void) {
         fprintf(stderr,
             "Erreur sémantique ligne %d: une fonction void ne peut pas être utilisée comme expression.\n",
             ligne);
@@ -337,32 +433,53 @@ static int checkNotVoidExpr(Node *expr, Table_symb *tableCourante, Table_symb *t
  * Vérifie la compatibilité de type pour une affectation (ident = valeur).
  * Émet un warning int→char. Retourne 0 si compatible, 2 sinon.
  */
-static int checkAssignType(Node *ident, Node *value,
-                           Table_symb *tableCourante, Table_symb *tableGlobale) {
-    char *type_dest = NULL;
-
-    for (Table_symb *t = tableCourante; t; t = t->suiv)
-        if (strcmp(t->ident, ident->value) == 0) { type_dest = t->type; break; }
-    if (!type_dest)
-        for (Table_symb *t = tableGlobale; t; t = t->suiv)
-            if (strcmp(t->ident, ident->value) == 0) { type_dest = t->type; break; }
-
-    if (!type_dest) return 0; /* variable inconnue, erreur déjà signalée ailleurs */
-
-    char *type_src = getExprType(value, tableCourante, tableGlobale);
-    if (!type_src) return 0;
-
-    warningType(type_dest, type_src, value->lineno);
-
-    /* Compatible : même type, ou char → int, ou int → char (avec warning déjà émis) */
-    if (strcmp(type_dest, type_src) == 0)                                   return 0;
-    if (strcmp(type_dest, "int")  == 0 && strcmp(type_src, "char") == 0)   return 0;
-    if (strcmp(type_dest, "char") == 0 && strcmp(type_src, "int")  == 0)   return 0;
-    if (strcmp(type_dest, "struct") == 0 || strcmp(type_src, "struct") == 0) return 0;
-
-    fprintf(stderr, "Erreur sémantique ligne %d: types incompatibles ('%s' = '%s').\n",
-            value->lineno, type_dest, type_src);
-    return 2;
+static int checkAssignType(Node *ident, Node *value, Table_symb *tableCourante, Table_symb *tableGlobale) {
+    TypeInfo *type_dest = getExprType(ident, tableCourante, tableGlobale);
+    TypeInfo *type_src = getExprType(value, tableCourante, tableGlobale);
+    
+    if (!type_dest || !type_src) {
+        if (type_dest) free_type_info(type_dest);
+        if (type_src) free_type_info(type_src);
+        return 0;
+    }
+    
+    // Warning int -> char
+    if (strcmp(type_dest->base_type, "char") == 0 && strcmp(type_src->base_type, "int") == 0) {
+        fprintf(stderr, "Warning ligne %d : affectation d'un int vers un char\n", value->lineno);
+    }
+    
+    // Vérification de compatibilité
+    int compatible = 0;
+    
+    if (strcmp(type_dest->base_type, type_src->base_type) == 0) {
+        if (strcmp(type_dest->base_type, "struct") == 0) {
+            // Même structure
+            if (type_dest->struct_name && type_src->struct_name &&
+                strcmp(type_dest->struct_name, type_src->struct_name) == 0) {
+                compatible = 1;
+            }
+        } else {
+            compatible = 1;
+        }
+    }
+    
+    // char <-> int (avec warning déjà émis)
+    if ((strcmp(type_dest->base_type, "int") == 0 && strcmp(type_src->base_type, "char") == 0) ||
+        (strcmp(type_dest->base_type, "char") == 0 && strcmp(type_src->base_type, "int") == 0)) {
+        compatible = 1;
+    }
+    
+    if (!compatible) {
+        fprintf(stderr, "Erreur sémantique ligne %d: types incompatibles ('%s' = '%s').\n",
+                value->lineno, type_info_to_string(type_dest), type_info_to_string(type_src));
+        free_type_info(type_dest);
+        free_type_info(type_src);
+        return 2;
+    }
+    
+    free_type_info(type_dest);
+    free_type_info(type_src);
+    return 0;
 }
 
 int haveCorrectMain(Table_symb **tableCourant) {
@@ -375,19 +492,57 @@ int haveCorrectMain(Table_symb **tableCourant) {
     return 0;
 }
 
-int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tableGlobale,
-                       FILE *anonym, int symbol, char *currentFctType) {
+int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tableGlobale, FILE *anonym, int symbol, char *currentFctType) {
     if (node == NULL) return 0;
 
     switch (node->label) {
 
         /* ── Déclaration de structure globale (on l'enregistre pour les vérifs futures) ── */
         case L_DECL_STRUCT: {
-            /*
-             * Pour l'instant on ne vérifie pas les conflits de noms de structures
-             * (le sujet dit que l'ident de struct peut être identique à une variable).
-             * On traverse simplement pour ne pas crasher.
-             */
+            Node *struct_name_node = node->firstChild;
+            if (!struct_name_node) break;
+            
+            char *struct_name = struct_name_node->value;
+            
+            // Collecter les champs
+            Field *fields = NULL;
+            Node *champ = struct_name_node->nextSibling;
+            
+            while (champ && champ->label == L_CHAMP) {
+                Node *type_node = champ->firstChild;
+                Node *declarateurs = type_node->nextSibling;
+                
+                char *field_type = NULL;
+                char *field_struct_name = NULL;
+                
+                if (type_node->label == L_TYPE_INT) {
+                    field_type = "int";
+                } else if (type_node->label == L_TYPE_CHAR) {
+                    field_type = "char";
+                } else if (type_node->label == L_TYPE_STRUCT) {
+                    field_type = "struct";
+                    field_struct_name = type_node->value;
+                    // Vérifier que la structure du champ existe déjà
+                    if (!find_struct(field_struct_name)) {
+                        // Ce n'est pas une erreur si elle est définie plus tard (en C c'est autorisé)
+                        // Mais on peut émettre un warning
+                        fprintf(stderr, "Warning ligne %d : structure '%s' utilisée avant définition\n",
+                                node->lineno, field_struct_name);
+                    }
+                }
+                
+                // Parcourir les déclarateurs
+                Node *decl = declarateurs;
+                while (decl && decl->label == L_IDENT) {
+                    Field *f = make_field(decl->value, field_type, field_struct_name);
+                    add_field(&fields, f);
+                    decl = decl->nextSibling;
+                }
+                
+                champ = champ->nextSibling;
+            }
+            
+            add_struct(struct_name, fields);
             break;
         }
 
@@ -396,7 +551,23 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             Node *typeNode = node->firstChild;
             if (!typeNode) break;
 
-            char *typeStr = getTypeString(typeNode);
+            char *typeStr = NULL;
+            char *struct_name = NULL;
+            
+            if (typeNode->label == L_TYPE_INT) {
+                typeStr = "int";
+            } else if (typeNode->label == L_TYPE_CHAR) {
+                typeStr = "char";
+            } else if (typeNode->label == L_TYPE_STRUCT) {
+                typeStr = "struct";
+                struct_name = typeNode->value;
+                // Vérifier que la structure existe
+                if (!find_struct(struct_name)) {
+                    fprintf(stderr, "Erreur sémantique ligne %d: structure '%s' non définie\n",
+                            node->lineno, struct_name);
+                    return 2;
+                }
+            }
 
             Node *varNode = typeNode->nextSibling;
             while (varNode != NULL) {
@@ -410,12 +581,15 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
                     }
                 }
 
-                /* POINT 3 — Conflit param / variable locale :
-                   add() retourne 0 si l'ident est déjà dans la table courante.
-                   Quand on est dans le corps d'une fonction, tableCourante contient
-                   déjà les paramètres → redéclarer un param comme variable locale
-                   est détecté ici et produit l'erreur appropriée. */
-                if (add(tableCourante, typeStr, varNode->value, 'v') == 0) {
+                /* Ajout de la variable avec ou sans structure */
+                int added;
+                if (struct_name) {
+                    added = add_struct_var(tableCourante, typeStr, struct_name, varNode->value, 'v');
+                } else {
+                    added = add(tableCourante, typeStr, varNode->value, 'v');
+                }
+                
+                if (added == 0) {
                     fprintf(stderr,
                         "Erreur sémantique ligne %d: '%s' déjà déclaré (conflit param/variable locale ou double déclaration).\n",
                         node->lineno, varNode->value);
@@ -461,15 +635,39 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
                 return 2;
             }
 
-            /* Enregistrer la fonction dans la table globale AVANT l'analyse du corps
-               (permet la récursivité directe et indirecte) */
-            add(tableCourante, getTypeString(typeRetour), nomFonct->value, 'f');
+            /* Récupérer le type de retour (peut être struct) */
+            char *ret_type = NULL;
+            char *ret_struct_name = NULL;
+            
+            if (typeRetour->label == L_TYPE_INT) {
+                ret_type = "int";
+            } else if (typeRetour->label == L_TYPE_CHAR) {
+                ret_type = "char";
+            } else if (typeRetour->label == L_TYPE_VOID) {
+                ret_type = "void";
+            } else if (typeRetour->label == L_TYPE_STRUCT) {
+                ret_type = "struct";
+                ret_struct_name = typeRetour->value;
+            }
+            
+            /* Enregistrer la fonction avec les infos de structure si nécessaire */
+            if (ret_struct_name) {
+                add_struct_var(tableCourante, ret_type, ret_struct_name, nomFonct->value, 'f');
+            } else {
+                add(tableCourante, ret_type, nomFonct->value, 'f');
+            }
 
             /* En-tête ASM pour main */
             if (strcmp(nomFonct->value, "main") == 0) {
-                fprintf(anonym, "global _start\n");
+                if (strcmp(ret_type, "int") != 0) {
+                    fprintf(stderr, "Erreur sémantique ligne %d: main doit retourner int\n", node->lineno);
+                    return 2;
+                }
+                fprintf(anonym, "global main\n");
                 fprintf(anonym, "section .text\n");
-                fprintf(anonym, "_start:\n");
+                fprintf(anonym, "main:\n");
+                fprintf(anonym, "\tpush rbp\n");
+                fprintf(anonym, "\tmov rbp, rsp\n");
             }
 
             printf("\n>>> Analyse de la fonction : %s\n", nomFonct->value);
@@ -479,13 +677,29 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             while (param != NULL) {
                 Node *typeParam = param->firstChild;
                 Node *nomParam  = typeParam->nextSibling;
-                add(&tableLocale, getTypeString(typeParam), nomParam->value, 'v');
+                
+                char *param_type = NULL;
+                char *param_struct_name = NULL;
+                
+                if (typeParam->label == L_TYPE_INT) {
+                    param_type = "int";
+                } else if (typeParam->label == L_TYPE_CHAR) {
+                    param_type = "char";
+                } else if (typeParam->label == L_TYPE_STRUCT) {
+                    param_type = "struct";
+                    param_struct_name = typeParam->value;
+                }
+                
+                if (param_struct_name) {
+                    add_struct_var(&tableLocale, param_type, param_struct_name, nomParam->value, 'v');
+                } else {
+                    add(&tableLocale, param_type, nomParam->value, 'v');
+                }
                 param = param->nextSibling;
             }
 
-            char *typeRetourStr = getTypeString(typeRetour);
             int ret = analyse_semantique(corps, &tableLocale, tableCourante,
-                                         anonym, symbol, typeRetourStr);
+                                        anonym, symbol, ret_type);
             if (ret != 0) {
                 freeTable(tableLocale);
                 return ret;
@@ -493,9 +707,9 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
 
             /* Footer ASM pour main */
             if (strcmp(nomFonct->value, "main") == 0) {
-                fprintf(anonym, "\tmov eax, 60\n");
-                fprintf(anonym, "\tmov rdi, 0\n");
-                fprintf(anonym, "\tsyscall\n");
+                fprintf(anonym, "\tmov rsp, rbp\n");
+                fprintf(anonym, "\tpop rbp\n");
+                fprintf(anonym, "\tret\n");
             }
 
             if (symbol) {
@@ -506,7 +720,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             freeTable(tableLocale);
             break;
         }
-
+        
         /* ── Affectation simple : ident = expr ── */
         case L_ASSIGN: {
             Node *ident = node->firstChild;
@@ -531,20 +745,73 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             if (r != 0) return r;
 
             translate_to_asm(value, anonym);
-            fprintf(anonym, "\tpop eax\n");
+            fprintf(anonym, "\tpop rax\n");
             fprintf(anonym, "\tmov [%s], eax\n", ident->value);
             break;
         }
 
         /* ── Affectation de champ de structure : ident.champ = expr ── */
         case L_FIELD_ASSIGN: {
-            Node *child = node->firstChild;
-            while (child) {
-                int r = analyse_semantique(child, tableCourante, tableGlobale,
-                                           anonym, symbol, currentFctType);
-                if (r != 0) return r;
-                child = child->nextSibling;
+            Node *field_access = node->firstChild;
+            Node *value = field_access ? field_access->nextSibling : NULL;
+            
+            if (!field_access || !value) break;
+            
+            // Vérifier le type du côté gauche (l'accès au champ)
+            TypeInfo *left_type = getExprType(field_access, *tableCourante,
+                                            tableGlobale ? *tableGlobale : NULL);
+            if (!left_type) return 2;
+            
+            // Vérifier que le côté gauche n'est pas void
+            if (strcmp(left_type->base_type, "void") == 0) {
+                fprintf(stderr, "Erreur sémantique ligne %d: affectation à une expression void\n",
+                        node->lineno);
+                free_type_info(left_type);
+                return 2;
             }
+            
+            // Vérifier le type du côté droit
+            int r = checkNotVoidExpr(value, *tableCourante,
+                                    tableGlobale ? *tableGlobale : NULL, node->lineno);
+            if (r != 0) {
+                free_type_info(left_type);
+                return r;
+            }
+            
+            TypeInfo *right_type = getExprType(value, *tableCourante,
+                                            tableGlobale ? *tableGlobale : NULL);
+            
+            // Vérifier la compatibilité
+            int compatible = 0;
+            if (strcmp(left_type->base_type, right_type->base_type) == 0) {
+                if (strcmp(left_type->base_type, "struct") == 0) {
+                    if (left_type->struct_name && right_type->struct_name &&
+                        strcmp(left_type->struct_name, right_type->struct_name) == 0)
+                        compatible = 1;
+                } else {
+                    compatible = 1;
+                }
+            }
+            
+            if (strcmp(left_type->base_type, "char") == 0 && strcmp(right_type->base_type, "int") == 0) {
+                fprintf(stderr, "Warning ligne %d : affectation d'un int vers un char\n", node->lineno);
+                compatible = 1;
+            }
+            
+            if (strcmp(left_type->base_type, "int") == 0 && strcmp(right_type->base_type, "char") == 0) {
+                compatible = 1;
+            }
+            
+            if (!compatible) {
+                fprintf(stderr, "Erreur sémantique ligne %d: types incompatibles pour l'affectation de champ\n",
+                        node->lineno);
+                free_type_info(left_type);
+                free_type_info(right_type);
+                return 2;
+            }
+            
+            free_type_info(left_type);
+            free_type_info(right_type);
             break;
         }
 
@@ -580,19 +847,23 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             if (strcmp(nom->value, "getint") == 0) {
                 need_getint = 1;
                 fprintf(anonym, "\tcall my_getint\n");
-                fprintf(anonym, "\tpush eax\n");
+                fprintf(anonym, "\tpush rax\n");
             } else if (strcmp(nom->value, "putint") == 0) {
                 need_putint = 1;
+                /* Récupérer l'argument depuis la pile (convention de votre compilateur) */
+                fprintf(anonym, "\tpop rdi\n");  /* 1er argument dans rdi */
                 fprintf(anonym, "\tcall my_putint\n");
-                fprintf(anonym, "\tadd rsp, 8\n");
             } else if (strcmp(nom->value, "putchar") == 0) {
                 need_putchar = 1;
+                fprintf(anonym, "\tpop rdi\n");
                 fprintf(anonym, "\tcall my_putchar\n");
             } else if (strcmp(nom->value, "getchar") == 0) {
                 need_getchar = 1;
                 fprintf(anonym, "\tcall my_getchar\n");
-                fprintf(anonym, "\tpush eax\n");
+                fprintf(anonym, "\tpush rax\n");
             } else {
+                /* Pour un appel normal, les arguments sont déjà sur la pile
+                Il faut les dépiler dans les registres dans l'ordre inverse */
                 fprintf(anonym, "\tcall %s\n", nom->value);
             }
             break;
@@ -615,8 +886,8 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             if (r != 0) return r;
 
             translate_to_asm(cond, anonym);
-            fprintf(anonym, "\tpop eax\n");
-            fprintf(anonym, "\tcmp eax, 0\n");
+            fprintf(anonym, "\tpop rax\n");
+            fprintf(anonym, "\tcmp rax, 0\n");
             fprintf(anonym, "\tje .fin_if_%d\n", lbl);
 
             r = analyse_semantique(corps, tableCourante, tableGlobale,
@@ -644,8 +915,8 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             if (r != 0) return r;
 
             translate_to_asm(cond, anonym);
-            fprintf(anonym, "\tpop eax\n");
-            fprintf(anonym, "\tcmp eax, 0\n");
+            fprintf(anonym, "\tpop rax\n");
+            fprintf(anonym, "\tcmp rax, 0\n");
             fprintf(anonym, "\tje .sinon_%d\n", lbl);
 
             r = analyse_semantique(corps_if, tableCourante, tableGlobale,
@@ -683,8 +954,8 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             
             /* Génération du code de la condition et test (32 bits) */
             translate_to_asm(cond, anonym);
-            fprintf(anonym, "\tpop eax\n");
-            fprintf(anonym, "\tcmp eax, 0\n");
+            fprintf(anonym, "\tpop rax\n");
+            fprintf(anonym, "\tcmp rax, 0\n");
             fprintf(anonym, "\tje .fin_while_%d\n", lbl);
 
             /* Corps de la boucle */
@@ -723,25 +994,34 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
 
             /* POINT 1 — l'expression retournée ne peut pas être void */
             int r = checkNotVoidExpr(elem, *tableCourante,
-                                     tableGlobale ? *tableGlobale : NULL, node->lineno);
+                                    tableGlobale ? *tableGlobale : NULL, node->lineno);
             if (r != 0) return r;
 
             /* Vérification du type de retour */
-            char *typeExpr = getExprType(elem, *tableCourante,
-                                         tableGlobale ? *tableGlobale : NULL);
+            TypeInfo *typeExpr = getExprType(elem, *tableCourante,
+                                            tableGlobale ? *tableGlobale : NULL);
             if (typeExpr && currentFctType) {
                 /* POINT 2 — warning si int retourné dans une fonction char */
-                warningType(currentFctType, typeExpr, node->lineno);
-                if (strcmp(typeExpr, currentFctType) != 0
-                    && !(strcmp(currentFctType, "int")  == 0 && strcmp(typeExpr, "char") == 0)
-                    && !(strcmp(currentFctType, "char") == 0 && strcmp(typeExpr, "int")  == 0)
-                    && !(strcmp(currentFctType, "struct") == 0)) {
+                warningType(currentFctType, typeExpr->base_type, node->lineno);
+                
+                int compatible = 0;
+                if (strcmp(typeExpr->base_type, currentFctType) == 0) {
+                    compatible = 1;
+                } else if (strcmp(currentFctType, "int") == 0 && strcmp(typeExpr->base_type, "char") == 0) {
+                    compatible = 1;
+                } else if (strcmp(currentFctType, "char") == 0 && strcmp(typeExpr->base_type, "int") == 0) {
+                    compatible = 1;
+                }
+                
+                if (!compatible) {
                     fprintf(stderr,
                         "Erreur sémantique ligne %d: type de retour incompatible (attendu '%s', obtenu '%s').\n",
-                        node->lineno, currentFctType, typeExpr);
+                        node->lineno, currentFctType, typeExpr->base_type);
+                    free_type_info(typeExpr);
                     return 2;
                 }
             }
+            if (typeExpr) free_type_info(typeExpr);
             break;
         }
 
