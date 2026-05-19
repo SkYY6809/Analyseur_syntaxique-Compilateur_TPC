@@ -1,4 +1,5 @@
 int main() {
-    int x = undeclared_function(5);
+    int x ;
+    x = undeclared_function(5);
     return 0;
 }

@@ -10,10 +10,7 @@ static int need_putchar = 0;
 static int need_putint  = 0;
 static int need_getchar = 0;
 static int need_getint  = 0;
-
-
 static int label_count = 0; //COMPTEUR DE LABELS (pour if/while/&&/||)
-
 
 
 /* Taille d'une structure (récursif) */
@@ -25,7 +22,7 @@ static int field_size(Field *f) {
     if (strcmp(f->type, "char") == 0) return 1;
     if (strcmp(f->type, "struct") == 0 && f->struct_name)
         return struct_size(f->struct_name);
-    return 8; /* fallback */
+    return 8;
 }
 
 static int struct_size(const char *sname) {
@@ -75,8 +72,6 @@ char* type_info_to_string(TypeInfo *ti) {
     return buffer;
 }
 
-
-
 static int isInAnyTable(const char *ident, Table_symb *locale, Table_symb *globale) {
     return isInTable((char*)ident, locale) || isInTable((char*)ident, globale);
 }
@@ -90,16 +85,12 @@ static Table_symb* findEntry(const char *ident, Table_symb *locale, Table_symb *
     return NULL;
 }
 
-
-
 void init_builtins(Table_symb **tableGlobale) {
     add(tableGlobale, "int",  "getint",  'f');
     add(tableGlobale, "void", "putint",  'f');
     add(tableGlobale, "int",  "getchar", 'f');
     add(tableGlobale, "void", "putchar", 'f');
 }
-
-
 
 static TypeInfo* getExprType(Node *node, Table_symb *tableCourante, Table_symb *tableGlobale) {
     if (!node) return NULL;
@@ -168,7 +159,6 @@ static TypeInfo* getExprType(Node *node, Table_symb *tableCourante, Table_symb *
 }
 
 
-
 /* Retourne 2 et imprime une erreur si l'expression est de type void */
 static int checkNotVoidExpr(Node *expr, Table_symb *tableCourante, Table_symb *tableGlobale, int ligne) {
     if (!expr) return 0;
@@ -187,9 +177,7 @@ static int checkNotVoidExpr(Node *expr, Table_symb *tableCourante, Table_symb *t
 
 /* Vérifie la compatibilité de type pour une affectation dest = src.
    Émet un warning int→char. Retourne 0 si OK, 2 si erreur. */
-static int checkAssignType(const char *type_dest, const char *sname_dest,
-                           const char *type_src,  const char *sname_src,
-                           int ligne) {
+static int checkAssignType(const char *type_dest, const char *sname_dest, const char *type_src,  const char *sname_src, int ligne) {
     if (!type_dest || !type_src) return 0;
 
     /* Warning int → char */
@@ -197,7 +185,7 @@ static int checkAssignType(const char *type_dest, const char *sname_dest,
         fprintf(stderr, "Warning ligne %d : affectation d'un int vers un char.\n", ligne);
         return 0; /* compatible mais avec warning */
     }
-    /* char → int : OK silencieux */
+    /* char → int : OK  */
     if (strcmp(type_dest, "int") == 0 && strcmp(type_src, "char") == 0)
         return 0;
     /* Mêmes types primitifs */
@@ -221,11 +209,7 @@ static int checkAssignType(const char *type_dest, const char *sname_dest,
 }
 
 
-
-static void emit_expr(Node *node, Table_symb *ctx_local, Table_symb *ctx_global, FILE *out);
-
-/* Émet le code pour pousser la valeur d'un identifiant sur la pile.
-   Cherche d'abord en local (offset rbp), puis en global (.bss). */
+/* Émet le code pour pousser la valeur d'un identifiant sur la pile. */
 static void emit_load_ident(const char *name, Table_symb *ctx_local, Table_symb *ctx_global, FILE *out) {
     /* Chercher en local d'abord */
     for (Table_symb *t = ctx_local; t; t = t->suiv) {
@@ -251,8 +235,6 @@ static void emit_load_ident(const char *name, Table_symb *ctx_local, Table_symb 
             return;
         }
     }
-    /* Fallback (ne devrait pas arriver après vérif sémantique) */
-    fprintf(out, "\tpush 0\t; WARN: ident '%s' non résolu\n", name);
 }
 
 static void emit_expr(Node *node, Table_symb *ctx_local, Table_symb *ctx_global, FILE *out) {
@@ -362,7 +344,7 @@ static void emit_expr(Node *node, Table_symb *ctx_local, Table_symb *ctx_global,
             emit_expr(node->firstChild->nextSibling, ctx_local, ctx_global, out);
             fprintf(out, "\tpop rbx\n");
             fprintf(out, "\tpop rax\n");
-            fprintf(out, "\tcdq\n");         /* sign-extend eax → edx:eax */
+            fprintf(out, "\tcdq\n");         
             fprintf(out, "\tidiv ebx\n");
             fprintf(out, "\tpush rax\n");    /* quotient */
             break;
@@ -421,9 +403,8 @@ static void emit_expr(Node *node, Table_symb *ctx_local, Table_symb *ctx_global,
 
             /* Convention AMD64 : arguments dans rdi, rsi, rdx, rcx, r8, r9 */
             const char *arg_regs[] = { "rdi", "rsi", "rdx", "rcx", "r8", "r9" };
+
             /* On dépile dans l'ordre inverse pour les charger dans rdi, rsi... */
-            /* Les args ont été pushés en ordre normal : le dernier est au sommet */
-            /* Donc on pop dans l'ordre inverse des registres */
             for (int i = argc - 1; i >= 0 && i < 6; i--)
                 fprintf(out, "\tpop %s\n", arg_regs[i]);
 
@@ -443,11 +424,11 @@ static void emit_expr(Node *node, Table_symb *ctx_local, Table_symb *ctx_global,
                 need_putchar = 1;
                 fprintf(out, "\tcall my_putchar\n");
             } else {
-                /* Aligner la pile sur 16 octets avant le call */
+                /* Aligner la pile */
                 fprintf(out, "\tsub rsp, 8\n");
                 fprintf(out, "\tcall %s\n", fname);
                 fprintf(out, "\tadd rsp, 8\n");
-                fprintf(out, "\tpush rax\n");   /* résultat disponible pour l'expression parente */
+                fprintf(out, "\tpush rax\n");   /* résultat  */
             }
             break;
         }
@@ -457,8 +438,6 @@ static void emit_expr(Node *node, Table_symb *ctx_local, Table_symb *ctx_global,
             break;
     }
 }
-
-
 
 static void emit_store_ident(const char *name, Table_symb *ctx_local, Table_symb *ctx_global, FILE *out) {
     for (Table_symb *t = ctx_local; t; t = t->suiv) {
@@ -479,12 +458,10 @@ static void emit_store_ident(const char *name, Table_symb *ctx_local, Table_symb
             return;
         }
     }
-    fprintf(out, "\t; WARN: store vers '%s' non résolu\n", name);
 }
 
 
-int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tableGlobale,
-                       FILE *anonym, int symbol, char *currentFctType) {
+int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tableGlobale, FILE *anonym, int symbol, char *currentFctType) {
     if (!node) return 0;
 
     switch (node->label) {
@@ -543,9 +520,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
                 typeStr = "struct";
                 sname   = typeNode->value;
                 if (!find_struct(sname)) {
-                    fprintf(stderr,
-                        "Erreur sémantique ligne %d : structure '%s' non définie.\n",
-                        node->lineno, sname);
+                    fprintf(stderr, "Erreur sémantique ligne %d : structure '%s' non définie.\n", node->lineno, sname);
                     return 2;
                 }
             }
@@ -557,9 +532,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             while (varNode) {
                 /* Conflit avec une fonction déjà déclarée (global only) */
                 if (is_global && isInTableWithKind(varNode->value, *tableCourante, 'f')) {
-                    fprintf(stderr,
-                        "Erreur sémantique ligne %d : '%s' est déjà le nom d'une fonction.\n",
-                        node->lineno, varNode->value);
+                    fprintf(stderr, "Erreur sémantique ligne %d : '%s' est déjà le nom d'une fonction.\n", node->lineno, varNode->value);
                     return 2;
                 }
 
@@ -570,24 +543,13 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
                     added = add(tableCourante, typeStr, varNode->value, 'v');
 
                 if (!added) {
-                    fprintf(stderr,
-                        "Erreur sémantique ligne %d : '%s' déjà déclaré.\n",
-                        node->lineno, varNode->value);
+                    fprintf(stderr, "Erreur sémantique ligne %d : '%s' déjà déclaré.\n", node->lineno, varNode->value);
                     return 2;
                 }
 
-                /* Calcul de l'offset pour les variables locales.
-                   En contexte local, tableGlobale != NULL. */
+                /* Calcul de l'offset pour les variables locales. */
                 if (!is_global) {
-                    /* Chercher la nouvelle entrée et lui assigner un offset.
-                       L'offset est l'accumulateur courant de la fonction.
-                       On utilise le champ offset de la première entrée comme
-                       compteur (valeur négative = distance depuis rbp). */
-                    /* Convention : on stocke l'offset courant dans une variable
-                       statique passée via le contexte. Ici on calcule la taille
-                       de toutes les variables locales pour obtenir l'offset. */
-                    int sz = (sname) ? struct_size(sname)
-                                     : (strcmp(typeStr, "char") == 0 ? 1 : 4);
+                    int sz = (sname) ? struct_size(sname) : (strcmp(typeStr, "char") == 0 ? 1 : 4);
                     /* Aligner sur 4 octets au minimum */
                     if (sz < 4) sz = 4;
 
@@ -617,15 +579,11 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
 
             /* Conflits */
             if (isInTableWithKind(nomFonct->value, *tableCourante, 'v')) {
-                fprintf(stderr,
-                    "Erreur sémantique ligne %d : '%s' est déjà le nom d'une variable globale.\n",
-                    node->lineno, nomFonct->value);
+                fprintf(stderr, "Erreur sémantique ligne %d : '%s' est déjà le nom d'une variable globale.\n", node->lineno, nomFonct->value);
                 return 2;
             }
             if (isInTableWithKind(nomFonct->value, *tableCourante, 'f')) {
-                fprintf(stderr,
-                    "Erreur sémantique ligne %d : fonction '%s' déjà déclarée.\n",
-                    node->lineno, nomFonct->value);
+                fprintf(stderr, "Erreur sémantique ligne %d : fonction '%s' déjà déclarée.\n", node->lineno, nomFonct->value);
                 return 2;
             }
 
@@ -645,16 +603,10 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             /* ── Construction de la table locale : paramètres ── */
             Table_symb *tableLocale = NULL;
 
-            /* En AMD64 SysV, les 6 premiers arguments arrivent dans :
-               rdi, rsi, rdx, rcx, r8, r9
-               On leur assigne un offset fictif négatif (rbp-N) pour les
-               stocker dans le prologue. On les empile dans le prologue
-               dans l'ordre inverse pour qu'ils soient accessibles via rbp. */
-            /* Registres 64-bit et 32-bit pour les paramètres (convention AMD64 SysV) */
+            /* Registres 64-bit et 32-bit pour les paramètres  */
             const char *param_regs64[] = { "rdi", "rsi", "rdx", "rcx", "r8",  "r9"  };
             const char *param_regs32[] = { "edi", "esi", "edx", "ecx", "r8d", "r9d" };
             const char *param_regs8[]  = { "dil", "sil", "dl",  "cl",  "r8b", "r9b" };
-            (void)param_regs64; /* silence unused warning if needed */
             int param_idx = 0;
 
             Node *param = params->firstChild;
@@ -667,8 +619,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
                 else if (typeParam->label == L_TYPE_CHAR)   ptype = "char";
                 else if (typeParam->label == L_TYPE_STRUCT) { ptype = "struct"; psname = typeParam->value; }
 
-                int sz = psname ? struct_size(psname)
-                                : (strcmp(ptype ? ptype : "int", "char") == 0 ? 1 : 4);
+                int sz = psname ? struct_size(psname) : (strcmp(ptype ? ptype : "int", "char") == 0 ? 1 : 4);
                 if (sz < 4) sz = 4; /* aligner sur 4 */
 
                 /* Offset cumulé */
@@ -706,16 +657,9 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             fprintf(anonym, "\tpush rbp\n");
             fprintf(anonym, "\tmov rbp, rsp\n");
 
-            /* Calculer la taille totale des locaux + paramètres
-               = offset max dans la table locale + marge pour les futures vars locales.
-               On calcule après le corps (analyse sémantique), donc on va d'abord
-               analyser le corps pour construire la table, puis on reviendra.
-               → Astuce : on émet un "sub rsp, XXXX" avec un placeholder et on
-                 revient le patcher. */
-
             /* Position dans le fichier pour patcher sub rsp */
             long patch_pos = ftell(anonym);
-            fprintf(anonym, "\tsub rsp, 00000000h\t; placeholder\n");
+            fprintf(anonym, "\tsub rsp, 00000000h\t\n");
 
             /* Sauvegarder les arguments (registres → pile locale) */
             param = params->firstChild;
@@ -741,7 +685,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             int max_off = 0;
             for (Table_symb *t = tableLocale; t; t = t->suiv)
                 if (t->offset > max_off) max_off = t->offset;
-            /* Arrondir à un multiple de 16 (convention ABI) */
+            /* Arrondir à un multiple de 16  */
             int frame_size = (max_off + 15) & ~15;
             if (frame_size == 0) frame_size = 16; /* au moins 16 */
 
@@ -795,50 +739,34 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             Node *rhs = lhs->nextSibling;
 
             /* Vérifier que la variable est déclarée */
-            if (!isInAnyTable(lhs->value,
-                              tableCourante ? *tableCourante : NULL,
-                              tableGlobale  ? *tableGlobale  : NULL)) {
-                fprintf(stderr,
-                    "Erreur sémantique ligne %d : variable '%s' non déclarée.\n",
-                    node->lineno, lhs->value);
+            if (!isInAnyTable(lhs->value, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL)) {
+                fprintf(stderr, "Erreur sémantique ligne %d : variable '%s' non déclarée.\n", node->lineno, lhs->value);
                 return 2;
             }
 
             /* Vérifier que le côté droit n'est pas void */
-            int r = checkNotVoidExpr(rhs,
-                tableCourante ? *tableCourante : NULL,
-                tableGlobale  ? *tableGlobale  : NULL, node->lineno);
+            int r = checkNotVoidExpr(rhs, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, node->lineno);
             if (r) return r;
 
             /* Vérifier les types */
-            TypeInfo *tdest = getExprType(lhs,
-                tableCourante ? *tableCourante : NULL,
-                tableGlobale  ? *tableGlobale  : NULL);
-            TypeInfo *tsrc  = getExprType(rhs,
-                tableCourante ? *tableCourante : NULL,
-                tableGlobale  ? *tableGlobale  : NULL);
+            TypeInfo *tdest = getExprType(lhs, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL);
+            TypeInfo *tsrc  = getExprType(rhs, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL);
 
             if (tdest && tsrc) {
-                r = checkAssignType(tdest->base_type, tdest->struct_name,
-                                    tsrc->base_type,  tsrc->struct_name,
-                                    node->lineno);
+                r = checkAssignType(tdest->base_type, tdest->struct_name, tsrc->base_type,  tsrc->struct_name, node->lineno);
             }
             if (tdest) free_type_info(tdest);
             if (tsrc)  free_type_info(tsrc);
             if (r) return r;
 
-            /* Analyse sémantique récursive du RHS (pour les appels imbriqués) */
+            /* Analyse sémantique récursive (pour les appels imbriqués) */
             r = analyse_semantique(rhs, tableCourante, tableGlobale, anonym, symbol, currentFctType);
             if (r) return r;
 
             /* Génération de code */
-            emit_expr(rhs,
-                tableCourante ? *tableCourante : NULL,
-                tableGlobale  ? *tableGlobale  : NULL, anonym);
+            emit_expr(rhs, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, anonym);
             fprintf(anonym, "\tpop rax\n");
-            emit_store_ident(lhs->value,
-                tableCourante ? *tableCourante : NULL,
-                tableGlobale  ? *tableGlobale  : NULL, anonym);
+            emit_store_ident(lhs->value, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, anonym);
             break;
         }
 
@@ -848,38 +776,25 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             Node *rhs = lhs->nextSibling;
 
             /* Vérif sémantique du type dest */
-            TypeInfo *tdest = getExprType(lhs,
-                tableCourante ? *tableCourante : NULL,
-                tableGlobale  ? *tableGlobale  : NULL);
+            TypeInfo *tdest = getExprType(lhs, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL);
             if (!tdest) {
                 fprintf(stderr,
                     "Erreur sémantique ligne %d : accès de champ invalide.\n", node->lineno);
                 return 2;
             }
 
-            int r = checkNotVoidExpr(rhs,
-                tableCourante ? *tableCourante : NULL,
-                tableGlobale  ? *tableGlobale  : NULL, node->lineno);
+            int r = checkNotVoidExpr(rhs, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, node->lineno);
             if (r) { free_type_info(tdest); return r; }
 
-            TypeInfo *tsrc = getExprType(rhs,
-                tableCourante ? *tableCourante : NULL,
-                tableGlobale  ? *tableGlobale  : NULL);
+            TypeInfo *tsrc = getExprType(rhs, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL);
 
             if (tdest && tsrc) {
-                r = checkAssignType(tdest->base_type, tdest->struct_name,
-                                    tsrc->base_type,  tsrc->struct_name,
-                                    node->lineno);
+                r = checkAssignType(tdest->base_type, tdest->struct_name, tsrc->base_type,  tsrc->struct_name, node->lineno);
             }
             if (tdest) free_type_info(tdest);
             if (tsrc)  free_type_info(tsrc);
             if (r) return r;
 
-            /* Note : génération de code pour l'accès aux champs de struct
-               non implémentée (structure entièrement en stack ou .bss
-               demanderait le calcul des offsets de champs).
-               On fait l'analyse sémantique mais on omet le codegen struct. */
-            fprintf(anonym, "\t; TODO: field_assign non supporté en codegen\n");
             break;
         }
 
@@ -887,35 +802,24 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
         case L_CALL: {
             Node *nom = node->firstChild;
 
-            if (!isInAnyTable(nom->value,
-                              tableCourante ? *tableCourante : NULL,
-                              tableGlobale  ? *tableGlobale  : NULL)) {
-                fprintf(stderr,
-                    "Erreur sémantique ligne %d : fonction '%s' non déclarée.\n",
-                    node->lineno, nom->value);
+            if (!isInAnyTable(nom->value, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL)) {
+                fprintf(stderr, "Erreur sémantique ligne %d : fonction '%s' non déclarée.\n", node->lineno, nom->value);
                 return 2;
             }
 
             /* Vérifier les arguments */
             Node *arg = nom->nextSibling;
             while (arg) {
-                int r = checkNotVoidExpr(arg,
-                    tableCourante ? *tableCourante : NULL,
-                    tableGlobale  ? *tableGlobale  : NULL, arg->lineno);
+                int r = checkNotVoidExpr(arg, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, arg->lineno);
                 if (r) return r;
                 arg = arg->nextSibling;
             }
 
-            /* Génération du code : émettre l'appel comme expression
-               puis jeter le résultat (instruction statement) */
-            emit_expr(node,
-                tableCourante ? *tableCourante : NULL,
-                tableGlobale  ? *tableGlobale  : NULL, anonym);
+            /* Génération du code  */
+            emit_expr(node, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, anonym);
 
             /* Si c'est un appel non-void, on a pushé un résultat → le retirer */
-            Table_symb *fe = findEntry(nom->value,
-                tableCourante ? *tableCourante : NULL,
-                tableGlobale  ? *tableGlobale  : NULL);
+            Table_symb *fe = findEntry(nom->value, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL);
             if (fe && strcmp(fe->type, "void") != 0)
                 fprintf(anonym, "\tadd rsp, 8\t; discard return value\n");
             break;
@@ -927,17 +831,13 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             Node *corps = cond->nextSibling;
             int lbl = label_count++;
 
-            int r = checkNotVoidExpr(cond,
-                tableCourante ? *tableCourante : NULL,
-                tableGlobale  ? *tableGlobale  : NULL, node->lineno);
+            int r = checkNotVoidExpr(cond, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, node->lineno);
             if (r) return r;
 
             r = analyse_semantique(cond, tableCourante, tableGlobale, anonym, symbol, currentFctType);
             if (r) return r;
 
-            emit_expr(cond,
-                tableCourante ? *tableCourante : NULL,
-                tableGlobale  ? *tableGlobale  : NULL, anonym);
+            emit_expr(cond, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, anonym);
             fprintf(anonym, "\tpop rax\n");
             fprintf(anonym, "\tcmp eax, 0\n");
             fprintf(anonym, "\tje .fin_if_%d\n", lbl);
@@ -956,17 +856,13 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             Node *corps_else = corps_if->nextSibling;
             int lbl = label_count++;
 
-            int r = checkNotVoidExpr(cond,
-                tableCourante ? *tableCourante : NULL,
-                tableGlobale  ? *tableGlobale  : NULL, node->lineno);
+            int r = checkNotVoidExpr(cond, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, node->lineno);
             if (r) return r;
 
             r = analyse_semantique(cond, tableCourante, tableGlobale, anonym, symbol, currentFctType);
             if (r) return r;
 
-            emit_expr(cond,
-                tableCourante ? *tableCourante : NULL,
-                tableGlobale  ? *tableGlobale  : NULL, anonym);
+            emit_expr(cond, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, anonym);
             fprintf(anonym, "\tpop rax\n");
             fprintf(anonym, "\tcmp eax, 0\n");
             fprintf(anonym, "\tje .sinon_%d\n", lbl);
@@ -989,9 +885,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             Node *corps = cond->nextSibling;
             int lbl = label_count++;
 
-            int r = checkNotVoidExpr(cond,
-                tableCourante ? *tableCourante : NULL,
-                tableGlobale  ? *tableGlobale  : NULL, node->lineno);
+            int r = checkNotVoidExpr(cond, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, node->lineno);
             if (r) return r;
 
             r = analyse_semantique(cond, tableCourante, tableGlobale, anonym, symbol, currentFctType);
@@ -999,9 +893,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
 
             fprintf(anonym, ".debut_while_%d:\n", lbl);
 
-            emit_expr(cond,
-                tableCourante ? *tableCourante : NULL,
-                tableGlobale  ? *tableGlobale  : NULL, anonym);
+            emit_expr(cond, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, anonym);
             fprintf(anonym, "\tpop rax\n");
             fprintf(anonym, "\tcmp eax, 0\n");
             fprintf(anonym, "\tje .fin_while_%d\n", lbl);
@@ -1021,9 +913,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             if (!expr) {
                 /* return sans valeur */
                 if (currentFctType && strcmp(currentFctType, "void") != 0) {
-                    fprintf(stderr,
-                        "Erreur sémantique ligne %d : return sans valeur dans une fonction '%s'.\n",
-                        node->lineno, currentFctType);
+                    fprintf(stderr, "Erreur sémantique ligne %d : return sans valeur dans une fonction '%s'.\n", node->lineno, currentFctType);
                     return 2;
                 }
                 /* Aller à l'épilogue */
@@ -1036,26 +926,18 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
 
             /* return avec valeur dans une fonction void */
             if (currentFctType && strcmp(currentFctType, "void") == 0) {
-                fprintf(stderr,
-                    "Erreur sémantique ligne %d : return avec valeur dans une fonction void.\n",
-                    node->lineno);
+                fprintf(stderr, "Erreur sémantique ligne %d : return avec valeur dans une fonction void.\n", node->lineno);
                 return 2;
             }
 
             /* Vérification : l'expression retournée n'est pas void */
-            int r = checkNotVoidExpr(expr,
-                tableCourante ? *tableCourante : NULL,
-                tableGlobale  ? *tableGlobale  : NULL, node->lineno);
+            int r = checkNotVoidExpr(expr, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, node->lineno);
             if (r) return r;
 
             /* Vérification du type de retour */
-            TypeInfo *texpr = getExprType(expr,
-                tableCourante ? *tableCourante : NULL,
-                tableGlobale  ? *tableGlobale  : NULL);
+            TypeInfo *texpr = getExprType(expr, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL);
             if (texpr && currentFctType) {
-                r = checkAssignType(currentFctType, NULL,
-                                    texpr->base_type, texpr->struct_name,
-                                    node->lineno);
+                r = checkAssignType(currentFctType, NULL, texpr->base_type, texpr->struct_name, node->lineno);
             }
             if (texpr) free_type_info(texpr);
             if (r) return r;
@@ -1064,9 +946,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             r = analyse_semantique(expr, tableCourante, tableGlobale, anonym, symbol, currentFctType);
             if (r) return r;
 
-            emit_expr(expr,
-                tableCourante ? *tableCourante : NULL,
-                tableGlobale  ? *tableGlobale  : NULL, anonym);
+            emit_expr(expr, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, anonym);
             fprintf(anonym, "\tpop rax\n");
             /* Épilogue inline pour le return */
             fprintf(anonym, "\tmov rsp, rbp\n");
@@ -1093,14 +973,10 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
 int haveCorrectMain(Table_symb **tableCourant) {
     if (!tableCourant) return 0;
     for (Table_symb *cur = *tableCourant; cur; cur = cur->suiv)
-        if (strcmp(cur->ident, "main") == 0 &&
-            strcmp(cur->type,  "int")  == 0 &&
-            cur->kind == 'f')
+        if (strcmp(cur->ident, "main") == 0 && strcmp(cur->type,  "int")  == 0 && cur->kind == 'f')
             return 1;
     return 0;
 }
-
-
 
 void generer_bss(FILE *anonym, Table_symb *tableGlobale) {
     int has_globals = 0;
