@@ -4,7 +4,5 @@ int b;
 int main(void) {
     a = 10;
     b = 5;
-    /* On teste l'expression : a + b * 2 - 4 */
-    /* Résultat attendu : 10 + (5 * 2) - 4 = 16 */
     putint(a + b * 2 - 4);
 }

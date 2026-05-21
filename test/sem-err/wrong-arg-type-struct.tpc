@@ -1,0 +1,12 @@
+struct p{
+    char x;
+    char y;
+};
+
+void foo(int x) { }
+
+int main() {
+    struct p p1; 
+    foo(p1);
+    return 0;
+}

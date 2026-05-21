@@ -1,4 +1,5 @@
 int main(){
-    fct();
+    int x;
+    x.p = 5;
     return 1;
 }

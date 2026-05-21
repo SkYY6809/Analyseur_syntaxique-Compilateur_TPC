@@ -1,0 +1,8 @@
+void test(int a, int b, char c, char d, int g, int j, int h){
+    
+}
+
+int main(){
+    test(2,3,'5','4',4,5,6);
+    return 2;
+}

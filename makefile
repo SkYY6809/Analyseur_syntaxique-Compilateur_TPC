@@ -3,12 +3,11 @@ CFLAGS = -Wall -g -Iobj -Isrc
 NASM   = nasm
 PARSER = bison_proj
 LEXER  = lex_proj
-ASM    = src/_anonymous.asm
-TPC   ?= gen-code-types.tpc
+ASM    = _anonymous.asm
 
 all: bin/tpcc
 
-# Ajout de struct_table.o aux dépendances
+# Dépendances
 bin/tpcc: obj/$(LEXER).o obj/$(PARSER).o obj/tree.o obj/compiler.o obj/semantique.o obj/struct_table.o
 	mkdir -p bin
 	$(CC) -o $@ $^ -lfl
@@ -41,15 +40,21 @@ obj/$(PARSER).c obj/$(PARSER).h: src/$(PARSER).y
 
 # TPC -> ASM
 asm: bin/tpcc
+	@if [ -z "$(TPC)" ]; then \
+		echo "Erreur: Vous devez spécifier TPC=monfichier.tpc"; \
+		exit 1; \
+	fi
 	./bin/tpcc $(TPC)
+
+# Déterminer le nom du fichier .asm généré
+ASM_FILE = $(if $(findstring <,$(TPC)),_anonymous.asm,$(subst .tpc,.asm,$(TPC)))
 
 # TPC -> ASM -> objet -> exécutable -> exécution
 run: asm
-	$(NASM) -f elf64 $(ASM) -o out.o
+	$(NASM) -f elf64 $(ASM_FILE) -o out.o
 	ld -no-pie out.o -o out
-	./out; echo "Code de retour : $$?"
+	./out; 
 
 clean:
-	rm -f obj/*.o obj/*.c obj/*.h bin/tpcc $(ASM) out.o out
-
-.PHONY: all asm run clean
+	rm -f obj/*.o obj/*.c obj/*.h bin/tpcc $(ASM_FILE) out.o out
+	find . -type f -name "*.asm" -not -path "./obj/*" -delete

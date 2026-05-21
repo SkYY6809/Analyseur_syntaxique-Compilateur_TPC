@@ -1,0 +1,24 @@
+struct Point{
+    int x;
+    int y;
+};
+
+struct Test{
+    int a;
+    char mot;
+    struct Point p;
+};
+
+int main(){
+    struct Point p, p2;
+    struct Test t;
+    p.x = 6;
+    p.y = 2;
+    t.a = 9;
+    t.mot = 'a';
+    t.p = p;
+    t.p.x = 3;
+    t.a = p.x;
+    p2 = p;
+    return 1;
+}

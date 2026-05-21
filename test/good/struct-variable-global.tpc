@@ -1,0 +1,12 @@
+struct Point{
+    char x;
+    char y;
+};
+
+struct Point p;
+
+int main(){
+    p.x = 5;
+    p.y = 2;
+    return 1;
+}

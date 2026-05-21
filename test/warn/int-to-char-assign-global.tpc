@@ -1,7 +1,7 @@
 char c;
-c = 1000;  
 
 int main() {
+    c = 1000;  
     putchar(c);
     return 0;
 }

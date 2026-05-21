@@ -3,10 +3,38 @@ struct Point {
     int y;
 };
 
+void test(struct Point p){
+    p.x = 6;
+    p.y = 9;
+}
+
+int param(int a){
+    return a;
+}
+
+struct Point retour(){
+    struct Point s;
+    s.x = 8;
+    s.y = 5;
+    return s;
+}
+
 int main() {
+    int i;
     struct Point p;
+    i = 5;
     p.x = 5;
     p.y = 7;
+    test(p);
+    if(p.y == 7){
+        return 1;
+    } else {
+        param(p.x);
+    }
+    while(i>0){
+        p.x = p.x + i;
+        i = i + 1;
+    }
     putint(p.x + p.y);
     return 0;
 }

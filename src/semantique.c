@@ -460,6 +460,13 @@ static void emit_store_ident(const char *name, Table_symb *ctx_local, Table_symb
     }
 }
 
+/* Vérifie si un nom est une fonction built-in qui ne peut pas être redéfinie */
+static int is_builtin_function(const char *name) {
+    return (strcmp(name, "getint") == 0 ||
+            strcmp(name, "getchar") == 0 ||
+            strcmp(name, "putint") == 0 ||
+            strcmp(name, "putchar") == 0);
+}
 
 int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tableGlobale, FILE *anonym, int symbol, char *currentFctType) {
     if (!node) return 0;
@@ -530,6 +537,21 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
 
             Node *varNode = typeNode->nextSibling;
             while (varNode) {
+
+                if (!is_global && tableGlobale && *tableGlobale) {
+                    Table_symb *global_entry = findEntry(varNode->value, NULL, *tableGlobale);
+                    if (global_entry && global_entry->kind == 'v') {
+                        fprintf(stderr, "Warning ligne %d : variable locale '%s' masque une variable globale du même nom.\n", 
+                                node->lineno, varNode->value);
+                    }
+                }
+                
+                if (is_global && is_builtin_function(varNode->value)) {
+                    fprintf(stderr, "Erreur sémantique ligne %d : '%s' est une fonction built-in, impossible de déclarer une variable avec ce nom.\n", 
+                            node->lineno, varNode->value);
+                    return 2;
+                }
+
                 /* Conflit avec une fonction déjà déclarée (global only) */
                 if (is_global && isInTableWithKind(varNode->value, *tableCourante, 'f')) {
                     fprintf(stderr, "Erreur sémantique ligne %d : '%s' est déjà le nom d'une fonction.\n", node->lineno, varNode->value);
@@ -578,6 +600,11 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             Node *params     = nomFonct->nextSibling;
 
             /* Conflits */
+            if (is_builtin_function(nomFonct->value)) {
+                fprintf(stderr, "Erreur sémantique ligne %d : redéfinition de la fonction built-in '%s' interdite.\n", 
+                        node->lineno, nomFonct->value);
+                return 2;
+            }
             if (isInTableWithKind(nomFonct->value, *tableCourante, 'v')) {
                 fprintf(stderr, "Erreur sémantique ligne %d : '%s' est déjà le nom d'une variable globale.\n", node->lineno, nomFonct->value);
                 return 2;
@@ -938,9 +965,12 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             TypeInfo *texpr = getExprType(expr, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL);
             if (texpr && currentFctType) {
                 r = checkAssignType(currentFctType, NULL, texpr->base_type, texpr->struct_name, node->lineno);
+                if (r == 2) {
+                    free_type_info(texpr);
+                    return r;
+                }
             }
             if (texpr) free_type_info(texpr);
-            if (r) return r;
 
             /* Génération : evaluer l'expression → résultat dans rax */
             r = analyse_semantique(expr, tableCourante, tableGlobale, anonym, symbol, currentFctType);
@@ -998,7 +1028,6 @@ void generer_bss(FILE *anonym, Table_symb *tableGlobale) {
         }
     }
 }
-
 
 void generer_footer_asm(FILE *anonym) {
 
@@ -1086,64 +1115,89 @@ void generer_footer_asm(FILE *anonym) {
         fprintf(anonym, "\tpush rbp\n");
         fprintf(anonym, "\tmov rbp, rsp\n");
         fprintf(anonym, "\tsub rsp, 16\n");
-        fprintf(anonym, "\txor r12d, r12d\n");         /* accumulateur */
-        /* Lire premier octet */
+        fprintf(anonym, "\txor r12d, r12d\n");          /* accumulateur */
+        
+        /* Lire premier caractère */
         fprintf(anonym, "\tmov eax, 0\n");
         fprintf(anonym, "\tmov edi, 0\n");
         fprintf(anonym, "\tlea rsi, [rbp-1]\n");
         fprintf(anonym, "\tmov edx, 1\n");
         fprintf(anonym, "\tsyscall\n");
         fprintf(anonym, "\tmovzx ebx, byte [rbp-1]\n");
-        /* Signe */
-        fprintf(anonym, "\txor r13d, r13d\n");
+        
+        /* Gestion du signe */
+        fprintf(anonym, "\txor r13d, r13d\n");          /* 0 = positif, 1 = négatif */
         fprintf(anonym, "\tcmp ebx, '-'\n");
-        fprintf(anonym, "\tje .gi_minus\n");
+        fprintf(anonym, "\tje .gi_handle_minus\n");
         fprintf(anonym, "\tcmp ebx, '+'\n");
-        fprintf(anonym, "\tje .gi_plus\n");
+        fprintf(anonym, "\tje .gi_handle_plus\n");
         fprintf(anonym, "\tjmp .gi_check_digit\n");
-        fprintf(anonym, ".gi_minus:\n");
+        
+        /* Cas du signe - */
+        fprintf(anonym, ".gi_handle_minus:\n");
         fprintf(anonym, "\tmov r13d, 1\n");
-        fprintf(anonym, ".gi_plus:\n");
+        fprintf(anonym, "\tjmp .gi_read_next\n");
+        
+        /* Cas du signe + */
+        fprintf(anonym, ".gi_handle_plus:\n");
+        fprintf(anonym, "\tmov r13d, 0\n");             /* signe positif explicite */
+        
+        /* Lire le caractère après le signe */
+        fprintf(anonym, ".gi_read_next:\n");
         fprintf(anonym, "\tmov eax, 0\n");
         fprintf(anonym, "\tmov edi, 0\n");
         fprintf(anonym, "\tlea rsi, [rbp-1]\n");
         fprintf(anonym, "\tmov edx, 1\n");
         fprintf(anonym, "\tsyscall\n");
         fprintf(anonym, "\tmovzx ebx, byte [rbp-1]\n");
+        
+        /* Vérifier que c'est un chiffre */
         fprintf(anonym, ".gi_check_digit:\n");
         fprintf(anonym, "\tcmp ebx, '0'\n");
         fprintf(anonym, "\tjl .gi_error\n");
         fprintf(anonym, "\tcmp ebx, '9'\n");
         fprintf(anonym, "\tjg .gi_error\n");
+        
+        /* Boucle de lecture des chiffres */
         fprintf(anonym, ".gi_loop:\n");
         fprintf(anonym, "\tsub ebx, '0'\n");
         fprintf(anonym, "\timul r12d, r12d, 10\n");
         fprintf(anonym, "\tadd r12d, ebx\n");
+        
+        /* Lire le caractère suivant */
         fprintf(anonym, "\tmov eax, 0\n");
         fprintf(anonym, "\tmov edi, 0\n");
         fprintf(anonym, "\tlea rsi, [rbp-1]\n");
         fprintf(anonym, "\tmov edx, 1\n");
         fprintf(anonym, "\tsyscall\n");
         fprintf(anonym, "\tmovzx ebx, byte [rbp-1]\n");
+        
+        /* Si c'est encore un chiffre, continuer */
         fprintf(anonym, "\tcmp ebx, '0'\n");
         fprintf(anonym, "\tjl .gi_done\n");
         fprintf(anonym, "\tcmp ebx, '9'\n");
         fprintf(anonym, "\tjg .gi_done\n");
         fprintf(anonym, "\tjmp .gi_loop\n");
+        
+        /* Fin de la lecture : doit se terminer par '\n' */
         fprintf(anonym, ".gi_done:\n");
-        fprintf(anonym, "\tcmp ebx, 10\n");            /* doit se terminer par '\n' */
+        fprintf(anonym, "\tcmp ebx, 10\n");             /* 10 = '\n' */
         fprintf(anonym, "\tjne .gi_error\n");
+        
+        /* Appliquer le signe et retourner */
         fprintf(anonym, "\tmov eax, r12d\n");
         fprintf(anonym, "\tcmp r13d, 0\n");
-        fprintf(anonym, "\tje .gi_ret\n");
+        fprintf(anonym, "\tje .gi_return\n");
         fprintf(anonym, "\tneg eax\n");
-        fprintf(anonym, ".gi_ret:\n");
+        fprintf(anonym, ".gi_return:\n");
         fprintf(anonym, "\tmov rsp, rbp\n");
         fprintf(anonym, "\tpop rbp\n");
         fprintf(anonym, "\tret\n");
+        
+        /* Erreur : quitter avec code 5 */
         fprintf(anonym, ".gi_error:\n");
-        fprintf(anonym, "\tmov eax, 60\n");
-        fprintf(anonym, "\tmov edi, 5\n");
+        fprintf(anonym, "\tmov eax, 60\n");             /* syscall exit */
+        fprintf(anonym, "\tmov edi, 5\n");              /* code retour 5 */
         fprintf(anonym, "\tsyscall\n");
     }
 

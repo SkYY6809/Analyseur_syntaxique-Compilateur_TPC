@@ -1,0 +1,6 @@
+int putchar;
+
+int main(){
+    putchar = 6;
+    return 1;
+}
