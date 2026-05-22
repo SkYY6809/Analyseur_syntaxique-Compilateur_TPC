@@ -1,0 +1,8 @@
+int main() {
+    int n;
+    n = -42;
+    putint(n);
+    putint(-1);
+    putint(0);
+    return 0;
+}

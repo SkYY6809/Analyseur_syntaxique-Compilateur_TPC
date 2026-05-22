@@ -1,0 +1,14 @@
+int double_val(int x) {
+    return x * 2;
+}
+
+int add(int a, int b) {
+    return a + b;
+}
+
+int main() {
+    putint(double_val(5));
+    putint(add(3, 7));
+    putint(add(double_val(4), 2));
+    return 0;
+}

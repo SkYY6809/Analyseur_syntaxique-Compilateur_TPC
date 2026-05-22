@@ -1,0 +1,6 @@
+int main() {
+    putint(10 % 3);
+    putint(7 % 7);
+    putint(1 % 5);
+    return 0;
+}

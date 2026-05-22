@@ -511,6 +511,12 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
                 }
                 champ = champ->nextSibling;
             }
+            /* Détecter la double déclaration de struct */
+            if (find_struct(sname)) {
+                fprintf(stderr, "Erreur sémantique ligne %d : structure '%s' déjà définie.\n",
+                        node->lineno, sname);
+                return 2;
+            }
             add_struct(sname, fields);
             break;
         }
@@ -679,10 +685,17 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
                 fprintf(anonym, "\tmov edi, eax\n");
                 fprintf(anonym, "\tmov eax, 60\n");
                 fprintf(anonym, "\tsyscall\n");
+            } else {
+                /* Pour les fonctions avant main, s'assurer qu'elles sont dans .text */
+                fprintf(anonym, "section .text\n");
             }
             fprintf(anonym, "\n%s:\n", nomFonct->value);
             fprintf(anonym, "\tpush rbp\n");
             fprintf(anonym, "\tmov rbp, rsp\n");
+            /* Initialiser eax à 0 : si main se termine sans return explicite,
+               le code de sortie sera 0 (comportement C standard) */
+            if (strcmp(nomFonct->value, "main") == 0)
+                fprintf(anonym, "\txor eax, eax\n");
 
             /* Position dans le fichier pour patcher sub rsp */
             long patch_pos = ftell(anonym);
@@ -861,9 +874,6 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             int r = checkNotVoidExpr(cond, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, node->lineno);
             if (r) return r;
 
-            r = analyse_semantique(cond, tableCourante, tableGlobale, anonym, symbol, currentFctType);
-            if (r) return r;
-
             emit_expr(cond, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, anonym);
             fprintf(anonym, "\tpop rax\n");
             fprintf(anonym, "\tcmp eax, 0\n");
@@ -884,9 +894,6 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             int lbl = label_count++;
 
             int r = checkNotVoidExpr(cond, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, node->lineno);
-            if (r) return r;
-
-            r = analyse_semantique(cond, tableCourante, tableGlobale, anonym, symbol, currentFctType);
             if (r) return r;
 
             emit_expr(cond, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, anonym);
@@ -913,9 +920,6 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             int lbl = label_count++;
 
             int r = checkNotVoidExpr(cond, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, node->lineno);
-            if (r) return r;
-
-            r = analyse_semantique(cond, tableCourante, tableGlobale, anonym, symbol, currentFctType);
             if (r) return r;
 
             fprintf(anonym, ".debut_while_%d:\n", lbl);
@@ -964,7 +968,17 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             /* Vérification du type de retour */
             TypeInfo *texpr = getExprType(expr, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL);
             if (texpr && currentFctType) {
-                r = checkAssignType(currentFctType, NULL, texpr->base_type, texpr->struct_name, node->lineno);
+                /* Chercher le struct_name du type de retour de la fonction courante
+                   dans la table globale (la fonction courante est la dernière entrée 'f') */
+                const char *ret_sname = NULL;
+                if (strcmp(currentFctType, "struct") == 0 && tableGlobale && *tableGlobale) {
+                    /* La fonction courante est dans la table globale — on cherche
+                       la dernière entrée de kind 'f' qui a type 'struct' */
+                    for (Table_symb *t = *tableGlobale; t; t = t->suiv)
+                        if (t->kind == 'f' && strcmp(t->type, "struct") == 0)
+                            ret_sname = t->struct_name;
+                }
+                r = checkAssignType(currentFctType, ret_sname, texpr->base_type, texpr->struct_name, node->lineno);
                 if (r == 2) {
                     free_type_info(texpr);
                     return r;
@@ -973,9 +987,6 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             if (texpr) free_type_info(texpr);
 
             /* Génération : evaluer l'expression → résultat dans rax */
-            r = analyse_semantique(expr, tableCourante, tableGlobale, anonym, symbol, currentFctType);
-            if (r) return r;
-
             emit_expr(expr, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, anonym);
             fprintf(anonym, "\tpop rax\n");
             /* Épilogue inline pour le return */

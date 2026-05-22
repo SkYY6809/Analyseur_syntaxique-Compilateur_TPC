@@ -1,0 +1,7 @@
+char double_char(char c) {
+    return 200;
+}
+int main() {
+    double_char('A');
+    return 0;
+}

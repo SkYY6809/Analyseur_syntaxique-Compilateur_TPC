@@ -1,0 +1,8 @@
+int main() {
+    char c;
+    c = 'A';
+    putchar(c);
+    putchar(c + 1);
+    putchar(10);
+    return 0;
+}

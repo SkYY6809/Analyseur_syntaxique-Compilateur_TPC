@@ -1,0 +1,11 @@
+int main() {
+    int a;
+    int b;
+    a = 1;
+    b = 0;
+    putint(a && b);
+    putint(a || b);
+    putint(!a);
+    putint(!b);
+    return 0;
+}
