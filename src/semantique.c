@@ -46,7 +46,6 @@ static int type_node_size(Node *typeNode) {
     }
 }
 
-
 TypeInfo* make_type_info(const char *base_type, const char *struct_name) {
     TypeInfo *ti = malloc(sizeof(TypeInfo));
     ti->base_type   = strdup(base_type);
@@ -148,18 +147,28 @@ static TypeInfo* getExprType(Node *node, Table_symb *tableCourante, Table_symb *
         }
 
         case L_ADD: case L_SUB: case L_MUL: case L_DIV: case L_MOD:
-        case L_NOT: case L_AND: case L_OR:
-        case L_EQ:  case L_NEQ: case L_LT:  case L_GT:  case L_LE:  case L_GE:
-        case L_NEG:
+        case L_AND: case L_OR:
+        case L_EQ:  case L_NEQ: case L_LT:  case L_GT:  case L_LE:  case L_GE: {
+            Node *left  = node->firstChild;
+            Node *right = left ? left->nextSibling : NULL;
+            TypeInfo *tl = getExprType(left,  tableCourante, tableGlobale);
+            TypeInfo *tr = getExprType(right, tableCourante, tableGlobale);
+            int lv = tl && strcmp(tl->base_type, "void") == 0;
+            int rv = tr && strcmp(tr->base_type, "void") == 0;
+            if (tl) free_type_info(tl);
+            if (tr) free_type_info(tr);
+            if (lv || rv) return make_type_info("void", NULL);
             return make_type_info("int", NULL);
-
+        }
+        case L_NOT: case L_NEG:
+            return make_type_info("int", NULL);
         default:
             return NULL;
     }
 }
 
 
-/* Retourne 2 et imprime une erreur si l'expression est de type void */
+/* Return 2 et print une erreur si l'expression est de type void */
 static int checkNotVoidExpr(Node *expr, Table_symb *tableCourante, Table_symb *tableGlobale, int ligne) {
     if (!expr) return 0;
     TypeInfo *t = getExprType(expr, tableCourante, tableGlobale);
@@ -176,16 +185,17 @@ static int checkNotVoidExpr(Node *expr, Table_symb *tableCourante, Table_symb *t
 }
 
 /* Vérifie la compatibilité de type pour une affectation dest = src.
-   Émet un warning int→char. Retourne 0 si OK, 2 si erreur. */
+   Émet un warning int to char. 
+   Retourne 0 si OK, 2 si erreur. */
 static int checkAssignType(const char *type_dest, const char *sname_dest, const char *type_src,  const char *sname_src, int ligne) {
     if (!type_dest || !type_src) return 0;
 
-    /* Warning int → char */
+    /* Warning int -> char */
     if (strcmp(type_dest, "char") == 0 && strcmp(type_src, "int") == 0) {
         fprintf(stderr, "Warning ligne %d : affectation d'un int vers un char.\n", ligne);
         return 0; /* compatible mais avec warning */
     }
-    /* char → int : OK  */
+    /* vérifie char to int */
     if (strcmp(type_dest, "int") == 0 && strcmp(type_src, "char") == 0)
         return 0;
     /* Mêmes types primitifs */
@@ -211,7 +221,7 @@ static int checkAssignType(const char *type_dest, const char *sname_dest, const 
 
 /* Émet le code pour pousser la valeur d'un identifiant sur la pile. */
 static void emit_load_ident(const char *name, Table_symb *ctx_local, Table_symb *ctx_global, FILE *out) {
-    /* Chercher en local d'abord */
+    /* Recherche en local d'abord */
     for (Table_symb *t = ctx_local; t; t = t->suiv) {
         if (strcmp(t->ident, name) == 0 && t->kind == 'v') {
             if (strcmp(t->type, "char") == 0) {
@@ -223,7 +233,7 @@ static void emit_load_ident(const char *name, Table_symb *ctx_local, Table_symb 
             return;
         }
     }
-    /* Chercher en global */
+    /* Recherche en global */
     for (Table_symb *t = ctx_global; t; t = t->suiv) {
         if (strcmp(t->ident, name) == 0 && t->kind == 'v') {
             if (strcmp(t->type, "char") == 0) {
@@ -247,7 +257,6 @@ static void emit_expr(Node *node, Table_symb *ctx_local, Table_symb *ctx_global,
             break;
 
         case L_CHAR:
-            /* node->value est de la forme 'x' ou '\n' etc. */
             fprintf(out, "\tpush %s\n", node->value);
             break;
 
@@ -401,10 +410,8 @@ static void emit_expr(Node *node, Table_symb *ctx_local, Table_symb *ctx_global,
                 arg = arg->nextSibling;
             }
 
-            /* Convention AMD64 : arguments dans rdi, rsi, rdx, rcx, r8, r9 */
             const char *arg_regs[] = { "rdi", "rsi", "rdx", "rcx", "r8", "r9" };
 
-            /* On dépile dans l'ordre inverse pour les charger dans rdi, rsi... */
             for (int i = argc - 1; i >= 0 && i < 6; i--)
                 fprintf(out, "\tpop %s\n", arg_regs[i]);
 
@@ -424,7 +431,7 @@ static void emit_expr(Node *node, Table_symb *ctx_local, Table_symb *ctx_global,
                 need_putchar = 1;
                 fprintf(out, "\tcall my_putchar\n");
             } else {
-                /* Aligner la pile */
+                /* Alignement de la pile */
                 fprintf(out, "\tsub rsp, 8\n");
                 fprintf(out, "\tcall %s\n", fname);
                 fprintf(out, "\tadd rsp, 8\n");
@@ -473,7 +480,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
 
     switch (node->label) {
 
-        /* ── Racine du programme ── */
+        /* Racine du programme */
         case L_PROG: {
             Node *child = node->firstChild;
             while (child) {
@@ -484,7 +491,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             return 0;
         }
 
-        /* ── Déclaration de structure globale ── */
+        /* Déclaration de structure globale */
         case L_DECL_STRUCT: {
             Node *name_node = node->firstChild;
             if (!name_node) break;
@@ -511,7 +518,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
                 }
                 champ = champ->nextSibling;
             }
-            /* Détecter la double déclaration de struct */
+            /* Empêcher la double déclaration de struct */
             if (find_struct(sname)) {
                 fprintf(stderr, "Erreur sémantique ligne %d : structure '%s' déjà définie.\n",
                         node->lineno, sname);
@@ -521,7 +528,6 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             break;
         }
 
-        /* ── Déclaration de variable ── */
         case L_DECL_VAR: {
             Node *typeNode = node->firstChild;
             if (!typeNode) break;
@@ -538,7 +544,6 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
                 }
             }
 
-            /* Contexte global : tableCourante est la table globale */
             int is_global = (tableGlobale == NULL || *tableGlobale == NULL);
 
             Node *varNode = typeNode->nextSibling;
@@ -558,7 +563,6 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
                     return 2;
                 }
 
-                /* Conflit avec une fonction déjà déclarée (global only) */
                 if (is_global && isInTableWithKind(varNode->value, *tableCourante, 'f')) {
                     fprintf(stderr, "Erreur sémantique ligne %d : '%s' est déjà le nom d'une fonction.\n", node->lineno, varNode->value);
                     return 2;
@@ -578,16 +582,13 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
                 /* Calcul de l'offset pour les variables locales. */
                 if (!is_global) {
                     int sz = (sname) ? struct_size(sname) : (strcmp(typeStr, "char") == 0 ? 1 : 4);
-                    /* Aligner sur 4 octets au minimum */
                     if (sz < 4) sz = 4;
 
-                    /* L'offset de la nouvelle variable = max(offset actuel) + sz.
-                       On parcourt la table locale pour trouver l'offset max. */
+
                     int max_off = 0;
                     for (Table_symb *t = *tableCourante; t; t = t->suiv)
                         if (t->offset > max_off) max_off = t->offset;
 
-                    /* Trouver la nouvelle entrée (la dernière) */
                     Table_symb *last = *tableCourante;
                     while (last->suiv) last = last->suiv;
                     last->offset = max_off + sz;
@@ -597,7 +598,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             break;
         }
 
-        /* ── Déclaration de fonction ── */
+        /* Déclaration de fonction */
         case L_DECL_FONCT: {
             Node *entete    = node->firstChild;
             Node *corps     = entete->nextSibling;
@@ -633,7 +634,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             else
                 add(tableCourante, ret_type, nomFonct->value, 'f');
 
-            /* ── Construction de la table locale : paramètres ── */
+            /* Construction de la table locale : paramètres */
             Table_symb *tableLocale = NULL;
 
             /* Registres 64-bit et 32-bit pour les paramètres  */
@@ -653,9 +654,8 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
                 else if (typeParam->label == L_TYPE_STRUCT) { ptype = "struct"; psname = typeParam->value; }
 
                 int sz = psname ? struct_size(psname) : (strcmp(ptype ? ptype : "int", "char") == 0 ? 1 : 4);
-                if (sz < 4) sz = 4; /* aligner sur 4 */
+                if (sz < 4) sz = 4;
 
-                /* Offset cumulé */
                 int max_off = 0;
                 for (Table_symb *t = tableLocale; t; t = t->suiv)
                     if (t->offset > max_off) max_off = t->offset;
@@ -674,12 +674,12 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
                 param_idx++;
             }
 
-            /* ── Prologue ASM ── */
+            /*  Prologue ASM */
             if (strcmp(nomFonct->value, "main") == 0) {
                 fprintf(anonym, "\nglobal main\n");
                 fprintf(anonym, "global _start\n");
                 fprintf(anonym, "section .text\n");
-                /* _start → appelle main puis exit(rax) */
+                /* _start -> appelle main puis exit(rax) */
                 fprintf(anonym, "\n_start:\n");
                 fprintf(anonym, "\tcall main\n");
                 fprintf(anonym, "\tmov edi, eax\n");
@@ -693,7 +693,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             fprintf(anonym, "\tpush rbp\n");
             fprintf(anonym, "\tmov rbp, rsp\n");
             /* Initialiser eax à 0 : si main se termine sans return explicite,
-               le code de sortie sera 0 (comportement C standard) */
+               le code de sortie sera 0 (On s'est basé sur le comportement C standard) */
             if (strcmp(nomFonct->value, "main") == 0)
                 fprintf(anonym, "\txor eax, eax\n");
 
@@ -701,7 +701,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             long patch_pos = ftell(anonym);
             fprintf(anonym, "\tsub rsp, 00000000h\t\n");
 
-            /* Sauvegarder les arguments (registres → pile locale) */
+            /* Sauvegarder les arguments (registres -> pile locale) */
             param = params->firstChild;
             param_idx = 0;
             for (Table_symb *t = tableLocale; t; t = t->suiv) {
@@ -714,7 +714,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
                 param_idx++;
             }
 
-            /* ── Analyse du corps ── */
+            /* Analyse du corps */
             int ret = analyse_semantique(corps, &tableLocale, tableCourante, anonym, symbol, ret_type);
             if (ret != 0) {
                 freeTable(tableLocale);
@@ -735,7 +735,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             fprintf(anonym, "\tsub rsp, %-8d\t", frame_size);
             fseek(anonym, cur_pos, SEEK_SET);
 
-            /* ── Épilogue ASM ── */
+            /*  Épilogue ASM  */
             fprintf(anonym, ".%s_epilogue:\n", nomFonct->value);
             fprintf(anonym, "\tmov rsp, rbp\n");
             fprintf(anonym, "\tpop rbp\n");
@@ -751,7 +751,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             break;
         }
 
-        /* ── Corps de fonction (liste de déclarations locales + instructions) ── */
+        /*  Corps de fonction (liste de déclarations locales + instructions)  */
         case L_CORPS: {
             Node *child = node->firstChild;
             while (child) {
@@ -762,7 +762,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             break;
         }
 
-        /* ── Bloc { SuiteInstr } ── */
+        /*  Bloc { SuiteInstr }  */
         case L_BLOCK: {
             Node *child = node->firstChild;
             while (child) {
@@ -773,7 +773,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             break;
         }
 
-        /* ── Affectation simple : ident = expr ── */
+        /*  Affectation simple : ident = expr  */
         case L_ASSIGN: {
             Node *lhs = node->firstChild;
             Node *rhs = lhs->nextSibling;
@@ -810,7 +810,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             break;
         }
 
-        /* ── Affectation de champ : expr.champ = expr ── */
+        /*  Affectation de champ : expr.champ = expr  */
         case L_FIELD_ASSIGN: {
             Node *lhs = node->firstChild;  /* L_FIELD_ACCESS */
             Node *rhs = lhs->nextSibling;
@@ -838,7 +838,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             break;
         }
 
-        /* ── Appel de fonction (instruction) ── */
+        /*  Appel de fonction (instruction)  */
         case L_CALL: {
             Node *nom = node->firstChild;
 
@@ -858,14 +858,14 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             /* Génération du code  */
             emit_expr(node, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, anonym);
 
-            /* Si c'est un appel non-void, on a pushé un résultat → le retirer */
+            /* Si c'est un appel non-void, on a pushé un résultat -> le retirer */
             Table_symb *fe = findEntry(nom->value, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL);
             if (fe && strcmp(fe->type, "void") != 0)
                 fprintf(anonym, "\tadd rsp, 8\t; discard return value\n");
             break;
         }
 
-        /* ── if sans else ── */
+        /*  if sans else  */
         case L_IF: {
             Node *cond  = node->firstChild;
             Node *corps = cond->nextSibling;
@@ -886,7 +886,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             break;
         }
 
-        /* ── if / else ── */
+        /*  if / else  */
         case L_IF_ELSE: {
             Node *cond       = node->firstChild;
             Node *corps_if   = cond->nextSibling;
@@ -913,7 +913,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             break;
         }
 
-        /* ── while ── */
+        /*  while  */
         case L_WHILE: {
             Node *cond  = node->firstChild;
             Node *corps = cond->nextSibling;
@@ -937,7 +937,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             break;
         }
 
-        /* ── return ── */
+        /*  return  */
         case L_RETURN: {
             Node *expr = node->firstChild;
 
@@ -986,7 +986,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             }
             if (texpr) free_type_info(texpr);
 
-            /* Génération : evaluer l'expression → résultat dans rax */
+            /* Génération : evaluer l'expression -> résultat dans rax */
             emit_expr(expr, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, anonym);
             fprintf(anonym, "\tpop rax\n");
             /* Épilogue inline pour le return */
@@ -996,7 +996,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             break;
         }
 
-        /* ── Nœuds à traverser sans action particulière ── */
+        /*  Nœuds à traverser sans action particulière  */
         default: {
             Node *child = node->firstChild;
             while (child) {
@@ -1042,7 +1042,7 @@ void generer_bss(FILE *anonym, Table_symb *tableGlobale) {
 
 void generer_footer_asm(FILE *anonym) {
 
-    /* ── my_putint(rdi) : affiche un entier signé suivi d'un '\n' ── */
+    /*  my_putint(rdi) : affiche un entier signé suivi d'un '\n'  */
     if (need_putint) {
         fprintf(anonym, "\nmy_putint:\n");
         fprintf(anonym, "\tpush rbp\n");
@@ -1103,7 +1103,7 @@ void generer_footer_asm(FILE *anonym) {
         fprintf(anonym, "\tret\n");
     }
 
-    /* ── my_putchar(rdi) : affiche un caractère ── */
+    /*  my_putchar(rdi) : affiche un caractère  */
     if (need_putchar) {
         fprintf(anonym, "\nmy_putchar:\n");
         fprintf(anonym, "\tpush rbp\n");
@@ -1120,7 +1120,7 @@ void generer_footer_asm(FILE *anonym) {
         fprintf(anonym, "\tret\n");
     }
 
-    /* ── my_getint() → rax : lit un entier signé suivi de '\n' ── */
+    /*  my_getint() -> rax : lit un entier signé suivi de '\n'  */
     if (need_getint) {
         fprintf(anonym, "\nmy_getint:\n");
         fprintf(anonym, "\tpush rbp\n");
@@ -1212,7 +1212,7 @@ void generer_footer_asm(FILE *anonym) {
         fprintf(anonym, "\tsyscall\n");
     }
 
-    /* ── my_getchar() → rax : lit un caractère ── */
+    /*  my_getchar() -> rax : lit un caractère  */
     if (need_getchar) {
         fprintf(anonym, "\nmy_getchar:\n");
         fprintf(anonym, "\tpush rbp\n");
