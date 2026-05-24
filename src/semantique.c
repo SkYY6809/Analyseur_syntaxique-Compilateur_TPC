@@ -35,16 +35,7 @@ static int struct_size(const char *sname) {
     return total;
 }
 
-/* Taille d'un type décrit par un nœud de type */
-static int type_node_size(Node *typeNode) {
-    if (!typeNode) return 8;
-    switch (typeNode->label) {
-        case L_TYPE_INT:    return 4;
-        case L_TYPE_CHAR:   return 1;
-        case L_TYPE_STRUCT: return struct_size(typeNode->value);
-        default:            return 8;
-    }
-}
+
 
 TypeInfo* make_type_info(const char *base_type, const char *struct_name) {
     TypeInfo *ti = malloc(sizeof(TypeInfo));
@@ -637,8 +628,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             /* Construction de la table locale : paramètres */
             Table_symb *tableLocale = NULL;
 
-            /* Registres 64-bit et 32-bit pour les paramètres  */
-            const char *param_regs64[] = { "rdi", "rsi", "rdx", "rcx", "r8",  "r9"  };
+            /* Registres  32-bit pour les paramètres  */
             const char *param_regs32[] = { "edi", "esi", "edx", "ecx", "r8d", "r9d" };
             const char *param_regs8[]  = { "dil", "sil", "dl",  "cl",  "r8b", "r9b" };
             int param_idx = 0;
@@ -692,7 +682,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             fprintf(anonym, "\n%s:\n", nomFonct->value);
             fprintf(anonym, "\tpush rbp\n");
             fprintf(anonym, "\tmov rbp, rsp\n");
-            /* Initialiser eax à 0 : si main se termine sans return explicite,
+            /* Initialiser eax à 0  si main se termine sans return explicite,
                le code de sortie sera 0 (On s'est basé sur le comportement C standard) */
             if (strcmp(nomFonct->value, "main") == 0)
                 fprintf(anonym, "\txor eax, eax\n");
@@ -773,7 +763,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             break;
         }
 
-        /*  Affectation simple : ident = expr  */
+        /*  Affectation simple  ident = expr  */
         case L_ASSIGN: {
             Node *lhs = node->firstChild;
             Node *rhs = lhs->nextSibling;
@@ -810,7 +800,6 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             break;
         }
 
-        /*  Affectation de champ : expr.champ = expr  */
         case L_FIELD_ASSIGN: {
             Node *lhs = node->firstChild;  /* L_FIELD_ACCESS */
             Node *rhs = lhs->nextSibling;
@@ -947,7 +936,6 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
                     fprintf(stderr, "Erreur sémantique ligne %d : return sans valeur dans une fonction '%s'.\n", node->lineno, currentFctType);
                     return 2;
                 }
-                /* Aller à l'épilogue */
                 /* On ne connaît pas le nom de la fonction ici, on émet ret directement */
                 fprintf(anonym, "\tmov rsp, rbp\n");
                 fprintf(anonym, "\tpop rbp\n");
@@ -961,7 +949,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
                 return 2;
             }
 
-            /* Vérification : l'expression retournée n'est pas void */
+            /* Vérification l'expression retournée n'est pas void */
             int r = checkNotVoidExpr(expr, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, node->lineno);
             if (r) return r;
 
@@ -986,7 +974,7 @@ int analyse_semantique(Node *node, Table_symb **tableCourante, Table_symb **tabl
             }
             if (texpr) free_type_info(texpr);
 
-            /* Génération : evaluer l'expression -> résultat dans rax */
+            /* Génération evaluer l'expression -> résultat dans rax */
             emit_expr(expr, tableCourante ? *tableCourante : NULL, tableGlobale  ? *tableGlobale  : NULL, anonym);
             fprintf(anonym, "\tpop rax\n");
             /* Épilogue inline pour le return */
@@ -1042,19 +1030,18 @@ void generer_bss(FILE *anonym, Table_symb *tableGlobale) {
 
 void generer_footer_asm(FILE *anonym) {
 
-    /*  my_putint(rdi) : affiche un entier signé suivi d'un '\n'  */
     if (need_putint) {
         fprintf(anonym, "\nmy_putint:\n");
         fprintf(anonym, "\tpush rbp\n");
         fprintf(anonym, "\tmov rbp, rsp\n");
         fprintf(anonym, "\tsub rsp, 32\n");
         fprintf(anonym, "\tpush rbx\n");
-        fprintf(anonym, "\tmov eax, edi\n");          /* paramètre dans edi (convention AMD64) */
+        fprintf(anonym, "\tmov eax, edi\n");          
         /* Cas zéro */
         fprintf(anonym, "\tcmp eax, 0\n");
         fprintf(anonym, "\tjne .pi_nonzero\n");
         fprintf(anonym, "\tmov byte [rbp-32], '0'\n");
-        fprintf(anonym, "\tmov byte [rbp-31], 10\n"); /* '\n' */
+        fprintf(anonym, "\tmov byte [rbp-31], 10\n"); 
         fprintf(anonym, "\tmov eax, 1\n");
         fprintf(anonym, "\tmov edi, 1\n");
         fprintf(anonym, "\tlea rsi, [rbp-32]\n");
@@ -1068,7 +1055,7 @@ void generer_footer_asm(FILE *anonym) {
         fprintf(anonym, "\tmov r8d, 1\n");
         fprintf(anonym, "\tneg eax\n");
         fprintf(anonym, ".pi_pos:\n");
-        fprintf(anonym, "\tlea r9, [rbp-2]\n");       /* laisser place pour '\n' à [rbp-1] */
+        fprintf(anonym, "\tlea r9, [rbp-2]\n");       
         fprintf(anonym, "\tmov ecx, 0\n");
         fprintf(anonym, "\tmov ebx, 10\n");
         fprintf(anonym, ".pi_loop:\n");
@@ -1089,7 +1076,7 @@ void generer_footer_asm(FILE *anonym) {
         fprintf(anonym, "\tinc ecx\n");
         fprintf(anonym, ".pi_nosign:\n");
         fprintf(anonym, "\tinc r9\n");
-        fprintf(anonym, "\tmov byte [r9+rcx], 10\n"); /* '\n' après les chiffres */
+        fprintf(anonym, "\tmov byte [r9+rcx], 10\n"); 
         fprintf(anonym, "\tinc ecx\n");
         fprintf(anonym, "\tmov eax, 1\n");
         fprintf(anonym, "\tmov rsi, r9\n");
@@ -1103,13 +1090,12 @@ void generer_footer_asm(FILE *anonym) {
         fprintf(anonym, "\tret\n");
     }
 
-    /*  my_putchar(rdi) : affiche un caractère  */
     if (need_putchar) {
         fprintf(anonym, "\nmy_putchar:\n");
         fprintf(anonym, "\tpush rbp\n");
         fprintf(anonym, "\tmov rbp, rsp\n");
         fprintf(anonym, "\tsub rsp, 8\n");
-        fprintf(anonym, "\tmov [rbp-1], dil\n");      /* dil = octet bas de rdi */
+        fprintf(anonym, "\tmov [rbp-1], dil\n");      
         fprintf(anonym, "\tmov eax, 1\n");
         fprintf(anonym, "\tmov edi, 1\n");
         fprintf(anonym, "\tlea rsi, [rbp-1]\n");
@@ -1120,15 +1106,13 @@ void generer_footer_asm(FILE *anonym) {
         fprintf(anonym, "\tret\n");
     }
 
-    /*  my_getint() -> rax : lit un entier signé suivi de '\n'  */
     if (need_getint) {
         fprintf(anonym, "\nmy_getint:\n");
         fprintf(anonym, "\tpush rbp\n");
         fprintf(anonym, "\tmov rbp, rsp\n");
         fprintf(anonym, "\tsub rsp, 16\n");
-        fprintf(anonym, "\txor r12d, r12d\n");          /* accumulateur */
+        fprintf(anonym, "\txor r12d, r12d\n");         
         
-        /* Lire premier caractère */
         fprintf(anonym, "\tmov eax, 0\n");
         fprintf(anonym, "\tmov edi, 0\n");
         fprintf(anonym, "\tlea rsi, [rbp-1]\n");
@@ -1136,24 +1120,20 @@ void generer_footer_asm(FILE *anonym) {
         fprintf(anonym, "\tsyscall\n");
         fprintf(anonym, "\tmovzx ebx, byte [rbp-1]\n");
         
-        /* Gestion du signe */
-        fprintf(anonym, "\txor r13d, r13d\n");          /* 0 = positif, 1 = négatif */
+        fprintf(anonym, "\txor r13d, r13d\n");         
         fprintf(anonym, "\tcmp ebx, '-'\n");
         fprintf(anonym, "\tje .gi_handle_minus\n");
         fprintf(anonym, "\tcmp ebx, '+'\n");
         fprintf(anonym, "\tje .gi_handle_plus\n");
         fprintf(anonym, "\tjmp .gi_check_digit\n");
         
-        /* Cas du signe - */
         fprintf(anonym, ".gi_handle_minus:\n");
         fprintf(anonym, "\tmov r13d, 1\n");
         fprintf(anonym, "\tjmp .gi_read_next\n");
         
-        /* Cas du signe + */
         fprintf(anonym, ".gi_handle_plus:\n");
-        fprintf(anonym, "\tmov r13d, 0\n");             /* signe positif explicite */
+        fprintf(anonym, "\tmov r13d, 0\n");             
         
-        /* Lire le caractère après le signe */
         fprintf(anonym, ".gi_read_next:\n");
         fprintf(anonym, "\tmov eax, 0\n");
         fprintf(anonym, "\tmov edi, 0\n");
@@ -1162,20 +1142,17 @@ void generer_footer_asm(FILE *anonym) {
         fprintf(anonym, "\tsyscall\n");
         fprintf(anonym, "\tmovzx ebx, byte [rbp-1]\n");
         
-        /* Vérifier que c'est un chiffre */
         fprintf(anonym, ".gi_check_digit:\n");
         fprintf(anonym, "\tcmp ebx, '0'\n");
         fprintf(anonym, "\tjl .gi_error\n");
         fprintf(anonym, "\tcmp ebx, '9'\n");
         fprintf(anonym, "\tjg .gi_error\n");
         
-        /* Boucle de lecture des chiffres */
         fprintf(anonym, ".gi_loop:\n");
         fprintf(anonym, "\tsub ebx, '0'\n");
         fprintf(anonym, "\timul r12d, r12d, 10\n");
         fprintf(anonym, "\tadd r12d, ebx\n");
         
-        /* Lire le caractère suivant */
         fprintf(anonym, "\tmov eax, 0\n");
         fprintf(anonym, "\tmov edi, 0\n");
         fprintf(anonym, "\tlea rsi, [rbp-1]\n");
@@ -1183,19 +1160,15 @@ void generer_footer_asm(FILE *anonym) {
         fprintf(anonym, "\tsyscall\n");
         fprintf(anonym, "\tmovzx ebx, byte [rbp-1]\n");
         
-        /* Si c'est encore un chiffre, continuer */
         fprintf(anonym, "\tcmp ebx, '0'\n");
         fprintf(anonym, "\tjl .gi_done\n");
         fprintf(anonym, "\tcmp ebx, '9'\n");
         fprintf(anonym, "\tjg .gi_done\n");
         fprintf(anonym, "\tjmp .gi_loop\n");
         
-        /* Fin de la lecture : doit se terminer par '\n' */
-        fprintf(anonym, ".gi_done:\n");
-        fprintf(anonym, "\tcmp ebx, 10\n");             /* 10 = '\n' */
+        fprintf(anonym, ".gi_done:\n"); 
         fprintf(anonym, "\tjne .gi_error\n");
         
-        /* Appliquer le signe et retourner */
         fprintf(anonym, "\tmov eax, r12d\n");
         fprintf(anonym, "\tcmp r13d, 0\n");
         fprintf(anonym, "\tje .gi_return\n");
@@ -1205,14 +1178,12 @@ void generer_footer_asm(FILE *anonym) {
         fprintf(anonym, "\tpop rbp\n");
         fprintf(anonym, "\tret\n");
         
-        /* Erreur : quitter avec code 5 */
         fprintf(anonym, ".gi_error:\n");
-        fprintf(anonym, "\tmov eax, 60\n");             /* syscall exit */
-        fprintf(anonym, "\tmov edi, 5\n");              /* code retour 5 */
+        fprintf(anonym, "\tmov eax, 60\n");             
+        fprintf(anonym, "\tmov edi, 5\n");              
         fprintf(anonym, "\tsyscall\n");
     }
 
-    /*  my_getchar() -> rax : lit un caractère  */
     if (need_getchar) {
         fprintf(anonym, "\nmy_getchar:\n");
         fprintf(anonym, "\tpush rbp\n");
